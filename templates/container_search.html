@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Container Search</h1>
+
+    <!-- Search Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('container_search') }}" class="d-flex gap-2" onsubmit="return handleSearch(event)">
+                <input type="text" name="search" class="form-control" placeholder="Enter container number..." value="{{ search_query }}">
+                <button type="submit" class="btn btn-primary">Search</button>
+                {% if search_query %}
+                    <a href="{{ url_for('container_search') }}" class="btn btn-secondary">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Containers by Destination -->
+    {% for destination, containers in containers_by_destination.items() %}
+    <div class="mb-5">
+        <h2 class="mb-4">{{ destination }}</h2>
+        <div class="row">
+            {% for container in containers %}
+            <div class="col-md-4 mb-4">
+                <div class="card {% if container.sur_et_start %}bg-danger-subtle
+                               {% elif container.shipments|length > 0 %}
+                                   {% if container.shipments|selectattr('payment_status', 'eq', 'paid')|list|length == container.shipments|length %}bg-success-subtle
+                                   {% elif container.shipments|selectattr('payment_status', 'ne', 'unpaid')|list|length > 0 %}bg-info-subtle
+                                   {% endif %}
+                               {% endif %}">
+                    <div class="card-body">
+                        <h5 class="card-title">Container #{{ container.container_number }}</h5>
+                        {% if container.container_name %}
+                        <p class="card-text text-muted">{{ container.container_name }}</p>
+                        {% endif %}
+                        <p class="card-text">Type: {{ container.container_type }}</p>
+                        <p class="card-text">Total Volume: {{ container.total_volume }} m³</p>
+                        <p class="card-text">Price: AED {{ container.price|format_number }}</p>
+                        <p class="card-text">Clients: {{ container.shipments|length }}</p>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-primary" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#containerModal"
+                                    onclick="showContainerDetails('{{ container.container_number }}')">
+                                View Details
+                            </button>
+                            {% if container.shipments|length > 0 and ((container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='price') + container.shipments|selectattr('payment_status', 'eq', 'partial')|sum(attribute='paid_amount')) / container.shipments|sum(attribute='price') * 100) >= 80 %}
+                                {% if current_user.role == 'Manager' %}
+                                    <form action="{{ url_for('upload_connaissement', id=container.id) }}" method="POST" enctype="multipart/form-data" class="d-inline">
+                                        <input type="file" name="pdf_file" accept=".pdf" class="d-none" onchange="this.form.submit()" id="pdf_{{ container.id }}">
+                                        <button type="button" class="btn btn-success" onclick="document.getElementById('pdf_{{ container.id }}').click()">
+                                            Upload PDF
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if container.connaissement_pdf %}
+                                    <a href="{{ url_for('download_connaissement', id=container.id) }}" class="btn btn-info">Download PDF</a>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Container Details Modal -->
+    <div class="modal fade" id="containerModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Container Details</h5>
+                    <div class="ms-auto">
+                        <button onclick="printContainerDetails()" class="btn btn-success me-2 no-print">Print List</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+                <div class="modal-body" id="containerDetails">
+                    {% if selected_container %}
+                    <!-- Print Header -->
+                    <div class="print-only mb-4">
+                        <div class="text-center mb-4">
+                            <h2 class="mb-2">Container #{{ selected_container.container_number }}</h2>
+                            {% if selected_container.container_name %}
+                            <h3 class="text-muted mb-3">{{ selected_container.container_name }}</h3>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="container-info">
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <strong>Type:</strong> {{ selected_container.container_type }}
+                                </div>
+                                <div class="info-item">
+                                    <strong>Destination:</strong> {{ selected_container.destination }}
+                                </div>
+                                <div class="info-item">
+                                    <strong>Created Date:</strong> {{ selected_container.created_at.strftime('%Y-%m-%d') }}
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="mb-4">
+                    </div>
+                    <!-- Move existing table here -->
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Client Name</th>
+                                    <th>Client Mark</th>
+                                    <th>Phone</th>
+                                    <th>Volume (m³)</th>
+                                    <th>Price</th>
+                                    <th>Extra Charge</th>
+                                    <th>Total Price</th>
+                                    <th>Payment Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for shipment in selected_container.shipments %}
+                                <tr class="payment-status-{{ shipment.payment_status }}">
+                                    <td>{{ shipment.client.name }}</td>
+                                    <td>{{ shipment.client.mark }}</td>
+                                    <td>{{ shipment.client.phone }}</td>
+                                    <td>{{ shipment.volume }}</td>
+                                    <td>AED {{ (shipment.price - shipment.extra_charge)|format_number }}</td>
+                                    <td>AED {{ shipment.extra_charge|format_number }}</td>
+                                    <td>AED {{ shipment.price|format_number }}</td>
+                                    <td>
+                                        {% if shipment.payment_status == 'unpaid' %}
+                                            <span class="badge bg-danger">Unpaid</span>
+                                        {% elif shipment.payment_status == 'partial' %}
+                                            <span class="badge bg-warning">
+                                                Partial
+                                                (AED {{ shipment.paid_amount|format_number }} / AED {{ shipment.price|format_number }})
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-success">Paid</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary fw-bold">
+                                    <td colspan="4" class="text-end">Total:</td>
+                                    <td>AED {{ (selected_container.shipments|sum(attribute='price') - selected_container.shipments|sum(attribute='extra_charge'))|format_number }}</td>
+                                    <td>AED {{ selected_container.shipments|sum(attribute='extra_charge')|format_number }}</td>
+                                    <td>AED {{ selected_container.shipments|sum(attribute='price')|format_number }}</td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-success fw-bold">
+                                    <td colspan="6" class="text-end">Total Payments Received:</td>
+                                    <td>AED {{ (selected_container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='price') + selected_container.shipments|selectattr('payment_status', 'eq', 'partial')|sum(attribute='paid_amount'))|format_number }}</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+function handleSearch(event) {
+    event.preventDefault();
+    const searchInput = event.target.querySelector('input[name="search"]');
+    showContainerDetails(searchInput.value);
+    return false;
+}
+
+// Update existing showContainerDetails function
+function showContainerDetails(containerNumber) {
+    window.location.href = `${window.location.pathname}?search=${containerNumber}#containerModal`;
+}
+
+// Show modal if hash exists in URL
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchQuery = urlParams.get('search');
+    if (searchQuery && window.location.hash === '#containerModal') {
+        new bootstrap.Modal(document.getElementById('containerModal')).show();
+    }
+});
+
+// Add event listener for modal close
+document.getElementById('containerModal').addEventListener('hidden.bs.modal', function () {
+    // Clear search parameter from URL without reloading
+    window.history.replaceState({}, '', window.location.pathname);
+    // Clear search input
+    document.querySelector('input[name="search"]').value = '';
+});
+
+function printContainerDetails() {
+    window.print();
+}
+</script>
+
+<style>
+.payment-status-unpaid {
+    background-color: rgba(220, 53, 69, 0.1) !important; /* light red */
+}
+.payment-status-partial {
+    background-color: rgba(255, 193, 7, 0.1) !important; /* light yellow */
+}
+.payment-status-paid {
+    background-color: rgba(40, 167, 69, 0.1) !important; /* light green */
+}
+
+@media print {
+    .navbar, 
+    .card-body form,
+    h1,
+    .row,
+    .no-print {
+        display: none !important;
+    }
+    .container {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .card-header {
+        border: none !important;
+        padding: 0 !important;
+    }
+    .card {
+        border: none !important;
+    }
+    .card-body {
+        padding: 0 !important;
+    }
+    @page {
+        margin: 0.5cm;
+    }
+    .modal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        margin: 0;
+        padding: 0;
+        overflow: visible!important;
+    }
+    .container-info {
+        font-size: 14px !important;  /* Increased from 12px */
+        margin: 20px 0 !important;
+    }
+    
+    .container-info .row {
+        border-bottom: 1px solid #eee !important;
+        padding: 8px 0 !important;
+    }
+    
+    .container-info strong {
+        font-weight: bold !important;
+        font-size: 15px !important;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin: 20px 0;
+    }
+
+    .info-item {
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+
+    .info-item strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #000;
+        font-size: 16px;
+    }
+
+    h2 { font-size: 28px !important; }
+    h3 { font-size: 24px !important; }
+    h4 { font-size: 20px !important; }
+    
+    .container-info {
+        font-size: 15px !important;
+    }
+
+    @page {
+        margin: 2cm;
+        size: A4 landscape;
+    }
+    
+    .modal-dialog {
+        max-width: none !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    .table {
+        font-size: 13px !important;  /* Increased from 11px */
+        width: 100% !important;
+    }
+    
+    th, td {
+        padding: 4px 8px !important;
+        white-space: nowrap !important;
+    }
+    
+    td:nth-child(1), /* Client Name */
+    td:nth-child(2) { /* Client Mark */
+        white-space: normal !important;
+        max-width: 150px !important;
+    }
+    
+    .badge {
+        border: 1px solid #000 !important;
+        padding: 2px 4px !important;
+        font-weight: normal !important;
+    }
+    
+    @page {
+        size: landscape;
+        margin: 1cm;
+    }
+    
+    h2 {
+        font-size: 24px !important;
+    }
+    
+    h3 {
+        font-size: 20px !important;
+    }
+
+    .modal-header {
+        display: none !important;
+    }
+    
+    .modal-body {
+        padding-top: 0 !important;
+    }
+}
+
+.bg-success-subtle {
+    background-color: rgba(25, 135, 84, 0.2) !important;  /* Stronger green */
+    border: 1px solid rgba(25, 135, 84, 0.3) !important;
+}
+
+.bg-info-subtle {
+    background-color: rgba(13, 110, 253, 0.2) !important;  /* Stronger blue */
+    border: 1px solid rgba(13, 110, 253, 0.3) !important;
+}
+
+.bg-danger-subtle {
+    background-color: rgba(220, 53, 69, 0.2) !important;  /* Stronger red */
+    border: 1px solid rgba(220, 53, 69, 0.3) !important;
+}
+</style>
+{% endblock %}

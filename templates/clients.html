@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Clients</h1>
+
+    <!-- Search Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('clients') }}" class="d-flex gap-2">
+                <input type="text" name="search" class="form-control" placeholder="Search clients..." value="{{ search_query }}">
+                <button type="submit" class="btn btn-primary">Search</button>
+                {% if search_query %}
+                    <a href="{{ url_for('clients') }}" class="btn btn-secondary">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Active Containers -->
+    <h2 class="mb-3">Active Containers</h2>
+    <div class="accordion mb-5" id="activeAccordion">
+        {% for container, clients in active_containers.items() %}
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button {% if container.id != selected_container %}collapsed{% endif %}" 
+                        type="button" data-bs-toggle="collapse" 
+                        data-bs-target="#container{{ container.id }}">
+                    Container #{{ container.container_number }}
+                    {% if container.container_name %} - {{ container.container_name }}{% endif %}
+                    <span class="badge bg-primary ms-2">{{ clients|length }} clients</span>
+                </button>
+            </h2>
+            <div id="container{{ container.id }}" 
+                 class="accordion-collapse collapse {% if container.id == selected_container %}show{% endif %}"
+                 data-bs-parent="#activeAccordion">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Mark</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client in clients %}
+                                <tr>
+                                    <td>{{ client.mark }}</td>
+                                    <td>{{ client.name }}</td>
+                                    <td>{{ client.phone }}</td>
+                                    <td>
+                                        <a href="{{ url_for('client_products', id=client.id) }}" 
+                                           class="btn btn-primary btn-sm">Products</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- History (Delivered Containers) -->
+    <h2 class="mb-3">History</h2>
+    <div class="accordion" id="historyAccordion">
+        {% for container, clients in history_containers.items() %}
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" 
+                        type="button" data-bs-toggle="collapse" 
+                        data-bs-target="#history{{ container.id }}">
+                    Container #{{ container.container_number }}
+                    {% if container.container_name %} - {{ container.container_name }}{% endif %}
+                    <span class="badge bg-secondary ms-2">{{ clients|length }} clients</span>
+                </button>
+            </h2>
+            <div id="history{{ container.id }}" 
+                 class="accordion-collapse collapse"
+                 data-bs-parent="#historyAccordion">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Mark</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client in clients %}
+                                <tr>
+                                    <td>{{ client.mark }}</td>
+                                    <td>{{ client.name }}</td>
+                                    <td>{{ client.phone }}</td>
+                                    <td>
+                                        <a href="{{ url_for('client_products', id=client.id) }}" 
+                                           class="btn btn-primary btn-sm">Products</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

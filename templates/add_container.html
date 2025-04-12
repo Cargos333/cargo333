@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Add New Container</h1>
+    <div class="card">
+        <div class="card-body">
+            <form action="{{ url_for('create_container') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="container_number" class="form-label">Container Number</label>
+                        <input type="text" class="form-control" id="container_number" name="container_number" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="container_name" class="form-label">Container Name</label>
+                        <input type="text" class="form-control" id="container_name" name="container_name">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="container_type" class="form-label">Container Type</label>
+                        <select class="form-select" id="container_type" name="container_type" required>
+                            <option value="20ft">20ft Standard</option>
+                            <option value="40ft">40ft Standard</option>
+                            <option value="40ft HC">40ft High Cube</option>
+                            <option value="45ft HC">45ft High Cube</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="total_volume" class="form-label">Total Volume (m³)</label>
+                        <input type="number" step="0.01" class="form-control" id="total_volume" name="total_volume" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="price" class="form-label">Price</label>
+                        <input type="number" step="0.01" class="form-control" id="price" name="price" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="destination" class="form-label">Destination</label>
+                        <select class="form-select" id="destination" name="destination" required>
+                            <option value="Mutsamudu">Mutsamudu</option>
+                            <option value="Moroni">Moroni</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Container</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,6 +9,11 @@ import pandas as pd
 import io
 from io import BytesIO
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -23,18 +28,29 @@ def load_user(user_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
+    try:
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            logger.info(f"Login attempt for user: {username}")
+            
+            user = User.query.filter_by(username=username).first()
+            
+            if user and check_password_hash(user.password, password):
+                login_user(user)
+                logger.info(f"Successful login for user: {username}")
+                return redirect(url_for('dashboard'))
+            else:
+                logger.warning(f"Failed login attempt for user: {username}")
+                flash('Invalid username or password')
         
-        if user and check_password_hash(user.password, password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password')
-    
-    return render_template('login.html')
+        return render_template('login.html')
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        db.session.rollback()
+        flash('An error occurred. Please try again.')
+        return render_template('login.html'), 500
 
 @app.route('/logout')
 @login_required

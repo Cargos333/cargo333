@@ -21,6 +21,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'a7153e2ffe196b572ee474300a7fd13b')
 
+# Configure database pooling
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 5,
+    'pool_recycle': 280,
+    'pool_pre_ping': True
+}
+
 try:
     db = SQLAlchemy(app)
     with app.app_context():

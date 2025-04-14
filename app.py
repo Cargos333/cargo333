@@ -9,11 +9,10 @@ import pandas as pd
 import io
 from io import BytesIO
 import os
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Add these constants at the top of the file
+CONTAINER_TYPES = ['40ft', '20ft']
+DESTINATIONS = ['Moroni', 'Mutsamudu']
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -28,29 +27,18 @@ def load_user(user_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    try:
-        if request.method == 'POST':
-            username = request.form.get('username')
-            password = request.form.get('password')
-            
-            logger.info(f"Login attempt for user: {username}")
-            
-            user = User.query.filter_by(username=username).first()
-            
-            if user and check_password_hash(user.password, password):
-                login_user(user)
-                logger.info(f"Successful login for user: {username}")
-                return redirect(url_for('dashboard'))
-            else:
-                logger.warning(f"Failed login attempt for user: {username}")
-                flash('Invalid username or password')
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
         
-        return render_template('login.html')
-    except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        db.session.rollback()
-        flash('An error occurred. Please try again.')
-        return render_template('login.html'), 500
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password')
+    
+    return render_template('login.html')
 
 @app.route('/logout')
 @login_required
@@ -89,7 +77,9 @@ def dashboard():
                          total_containers=total_containers,
                          active_containers=active_containers,
                          total_clients=total_clients,
-                         total_delivered=total_delivered)
+                         total_delivered=total_delivered,
+                         container_types=CONTAINER_TYPES,
+                         destinations=DESTINATIONS)
 
 @app.route('/container/<int:id>')
 @login_required
@@ -220,6 +210,28 @@ def toggle_container_priority(id):
     container = Container.query.get_or_404(id)
     container.sur_et_start = not container.sur_et_start
     db.session.commit()
+    return redirect(url_for('dashboard'))
+
+@app.route('/container/<int:id>/edit', methods=['POST'])
+@login_required
+def edit_container(id):
+    try:
+        container = Container.query.get_or_404(id)
+        
+        container.container_number = request.form.get('container_number')
+        container.container_name = request.form.get('container_name')
+        container.container_type = request.form.get('container_type')
+        container.total_volume = float(request.form.get('total_volume'))
+        container.price = float(request.form.get('price'))
+        container.destination = request.form.get('destination')
+        
+        db.session.commit()
+        flash('Container updated successfully')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating container: {str(e)}')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/shipment/<int:id>/update_payment', methods=['POST'])
@@ -687,4 +699,4 @@ def download_connaissement(id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5002)))

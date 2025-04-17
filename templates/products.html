@@ -1,11 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">Products for {{ client.name }}</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <h1>Products for {{ client.name }}</h1>
+        <button onclick="printProducts()" class="btn btn-success">
+            <i class="fas fa-print"></i> Print Products
+        </button>
+    </div>
+    
+    <div class="print-header" style="display: none;">
+        <h2 class="text-center mb-3">Products List</h2>
+        <div class="client-info mb-4">
+            <p><strong>Client Name:</strong> {{ client.name }}</p>
+            <p><strong>Mark:</strong> {{ client.mark }}</p>
+            <p><strong>Phone:</strong> {{ client.phone }}</p>
+        </div>
+        <hr>
+    </div>
 
     {% if not container_delivered %}
     <!-- Add Product Form -->
-    <div class="card mb-4">
+    <div class="card mb-4 no-print">
         <div class="card-header">
             <h5 class="mb-0">Add New Product</h5>
         </div>
@@ -133,6 +148,52 @@
     </div>
 </div>
 
+<style>
+@media print {
+    .navbar, 
+    .no-print,
+    button,
+    form,
+    .edit-mode,
+    th:last-child,
+    td:last-child,
+    .card-header {
+        display: none !important;
+    }
+    
+    h1, h2 {
+        display: none !important;
+    }
+    
+    .print-header {
+        display: block !important;
+        margin-bottom: 20px;
+    }
+    
+    .container {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 20px !important;
+    }
+    
+    table {
+        width: 100% !important;
+        font-size: 12px !important;
+        border-collapse: collapse !important;
+    }
+    
+    th, td {
+        padding: 8px !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    @page {
+        size: portrait;
+        margin: 1.5cm;
+    }
+}
+</style>
+
 <script>
 function toggleEdit(productId) {
     const row = document.getElementById(`row-${productId}`);
@@ -158,6 +219,10 @@ function saveProduct(productId) {
             alert('Error updating product');
         }
     });
+}
+
+function printProducts() {
+    window.print();
 }
 </script>
 {% endblock %}

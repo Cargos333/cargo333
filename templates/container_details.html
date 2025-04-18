@@ -126,15 +126,43 @@
             <tbody>
                 {% for shipment in container.shipments %}
                 <tr data-shipment-id="{{ shipment.id }}">
-                    <td data-client-mark>{{ shipment.client.mark }}</td>
-                    <td data-client-name>{{ shipment.client.name }}</td>
-                    <td data-client-phone>{{ shipment.client.phone }}</td>
-                    <td data-volume>{{ shipment.volume }}</td>
-                    <td><span data-price>{{ shipment.price|format_number }}</span> AED</td>
-                    <td><span data-extra>{{ shipment.extra_charge|format_number }}</span> AED</td>
-                    <td><span data-total>{{ (shipment.price + shipment.extra_charge)|format_number }}</span> AED</td>
-                    <td data-payment-status>{{ shipment.payment_status }}</td>
-                    <td><span data-paid>{{ shipment.paid_amount|format_number }}</span> AED</td>
+                    <td>
+                        <span class="view-mode">{{ shipment.client.mark }}</span>
+                        <input type="text" class="form-control edit-mode d-none" name="client_mark" value="{{ shipment.client.mark }}">
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ shipment.client.name }}</span>
+                        <input type="text" class="form-control edit-mode d-none" name="client_name" value="{{ shipment.client.name }}">
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ shipment.client.phone }}</span>
+                        <input type="text" class="form-control edit-mode d-none" name="client_phone" value="{{ shipment.client.phone }}">
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ shipment.volume }}</span>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="volume" value="{{ shipment.volume }}" onchange="recalculatePrice(this)">
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ shipment.price|format_number }} AED</span>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="price" value="{{ shipment.price }}">
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ shipment.extra_charge|format_number }} AED</span>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="extra_charge" value="{{ shipment.extra_charge }}">
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ (shipment.price + shipment.extra_charge)|format_number }} AED</span>
+                    </td>
+                    <td>
+                        <span class="view-mode">{{ shipment.payment_status }}</span>
+                        <select class="form-select edit-mode d-none" name="payment_status" onchange="toggleEditPartialInput(this)">
+                            <option value="paid" {% if shipment.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                            <option value="unpaid" {% if shipment.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                            <option value="partial" {% if shipment.payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                        </select>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="paid_amount" value="{{ shipment.paid_amount }}" 
+                               style="display: {% if shipment.payment_status == 'partial' %}block{% else %}none{% endif %};">
+                    </td>
                     <td>
                         {% if container.status != 'delivered' %}
                         <div class="btn-group" role="group">
@@ -198,8 +226,11 @@ function calculatePrice() {
 
 function toggleEditMode(shipmentId) {
     const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
-    row.querySelectorAll('.view-mode').forEach(el => el.classList.toggle('d-none'));
-    row.querySelectorAll('.edit-mode').forEach(el => el.classList.toggle('d-none'));
+    const viewElements = row.querySelectorAll('.view-mode');
+    const editElements = row.querySelectorAll('.edit-mode');
+    
+    viewElements.forEach(el => el.classList.toggle('d-none'));
+    editElements.forEach(el => el.classList.toggle('d-none'));
 }
 
 function recalculatePrice(volumeInput) {
@@ -261,6 +292,16 @@ function toggleEditPartialInput(select) {
 function printClientRow(shipmentId) {
     const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
     const containerNumber = '{{ container.container_number }}';
+    
+    // Get text content from view-mode spans
+    const clientName = row.querySelector('td:nth-child(2) .view-mode').textContent;
+    const clientMark = row.querySelector('td:nth-child(1) .view-mode').textContent;
+    const clientPhone = row.querySelector('td:nth-child(3) .view-mode').textContent;
+    const volume = row.querySelector('td:nth-child(4) .view-mode').textContent;
+    const price = row.querySelector('td:nth-child(5) .view-mode').textContent;
+    const extraCharge = row.querySelector('td:nth-child(6) .view-mode').textContent;
+    const total = row.querySelector('td:nth-child(7) .view-mode').textContent;
+
     const printWindow = window.open('', '', 'height=600,width=800');
     
     printWindow.document.write(`
@@ -360,9 +401,9 @@ function printClientRow(shipmentId) {
 
                     <div class="header">
                         <h2>Container #${containerNumber}</h2>
-                        <p><strong>Client Name:</strong> ${row.querySelector('[data-client-name]').textContent}</p>
-                        <p><strong>Mark:</strong> ${row.querySelector('[data-client-mark]').textContent}</p>
-                        <p><strong>Phone:</strong> ${row.querySelector('[data-client-phone]').textContent}</p>
+                        <p><strong>Client Name:</strong> ${clientName}</p>
+                        <p><strong>Mark:</strong> ${clientMark}</p>
+                        <p><strong>Phone:</strong> ${clientPhone}</p>
                     </div>
 
                     <table>
@@ -373,10 +414,10 @@ function printClientRow(shipmentId) {
                             <th>Total (AED)</th>
                         </tr>
                         <tr>
-                            <td>${row.querySelector('[data-volume]').textContent}</td>
-                            <td>${row.querySelector('[data-price]').textContent}</td>
-                            <td>${row.querySelector('[data-extra]').textContent}</td>
-                            <td>${row.querySelector('[data-total]').textContent}</td>
+                            <td>${volume}</td>
+                            <td>${price}</td>
+                            <td>${extraCharge}</td>
+                            <td>${total}</td>
                         </tr>
                     </table>
                     <div class="contacts">
@@ -384,8 +425,7 @@ function printClientRow(shipmentId) {
                             <div class="contact-column">
                                 <h3>Information in Dubai:</h3>
                                 <div class="contact-info">PAPA LALY: +971 55 309 9610
-AHMED ABDALLAH: +971 55 215 4173
-ABDOULHALIM: +971 55 503 5469</div>
+AHMED: +971 55 215 4173</div>
                             </div>
                             <div class="contact-column">
                                 <h3>Information in Comoros:</h3>

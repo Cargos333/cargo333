@@ -126,16 +126,16 @@
                                     <td>{{ shipment.client.mark }}</td>
                                     <td>{{ shipment.client.phone }}</td>
                                     <td>{{ shipment.volume }}</td>
-                                    <td>AED {{ (shipment.price - shipment.extra_charge)|format_number }}</td>
-                                    <td>AED {{ shipment.extra_charge|format_number }}</td>
                                     <td>AED {{ shipment.price|format_number }}</td>
+                                    <td>AED {{ shipment.extra_charge|format_number }}</td>
+                                    <td>AED {{ (shipment.price + shipment.extra_charge)|format_number }}</td>
                                     <td>
                                         {% if shipment.payment_status == 'unpaid' %}
                                             <span class="badge bg-danger">Unpaid</span>
                                         {% elif shipment.payment_status == 'partial' %}
                                             <span class="badge bg-warning">
                                                 Partial
-                                                (AED {{ shipment.paid_amount|format_number }} / AED {{ shipment.price|format_number }})
+                                                (AED {{ shipment.paid_amount|format_number }} / AED {{ (shipment.price + shipment.extra_charge)|format_number }})
                                             </span>
                                         {% else %}
                                             <span class="badge bg-success">Paid</span>
@@ -147,15 +147,14 @@
                             <tfoot>
                                 <tr class="table-secondary fw-bold">
                                     <td colspan="4" class="text-end">Total:</td>
-                                    <td>AED {{ (selected_container.shipments|sum(attribute='price') - selected_container.shipments|sum(attribute='extra_charge'))|format_number }}</td>
-                                    <td>AED {{ selected_container.shipments|sum(attribute='extra_charge')|format_number }}</td>
                                     <td>AED {{ selected_container.shipments|sum(attribute='price')|format_number }}</td>
+                                    <td>AED {{ selected_container.shipments|sum(attribute='extra_charge')|format_number }}</td>
+                                    <td>AED {{ (selected_container.shipments|sum(attribute='price') + selected_container.shipments|sum(attribute='extra_charge'))|format_number }}</td>
                                     <td></td>
                                 </tr>
                                 <tr class="table-success fw-bold">
                                     <td colspan="6" class="text-end">Total Payments Received:</td>
-                                    <td>AED {{ (selected_container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='price') + selected_container.shipments|selectattr('payment_status', 'eq', 'partial')|sum(attribute='paid_amount'))|format_number }}</td>
-                                    <td></td>
+                                    <td colspan="2">AED {{ (selected_container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='price') + selected_container.shipments|selectattr('payment_status', 'eq', 'partial')|sum(attribute='paid_amount'))|format_number }}</td>
                                 </tr>
                             </tfoot>
                         </table>

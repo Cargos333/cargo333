@@ -301,13 +301,16 @@ function printClientRow(shipmentId) {
     const price = row.querySelector('td:nth-child(5) .view-mode').textContent;
     const extraCharge = row.querySelector('td:nth-child(6) .view-mode').textContent;
     const total = row.querySelector('td:nth-child(7) .view-mode').textContent;
-
+    const paymentStatus = row.querySelector('td:nth-child(8) .view-mode').textContent;
+    
+    const isPaid = paymentStatus.trim() === 'paid';
+    
     const printWindow = window.open('', '', 'height=600,width=800');
     
     printWindow.document.write(`
         <html>
             <head>
-                <title>Client Details</title>
+                <title>${clientMark} - Invoice</title>
                 <style>
                     body { 
                         font-family: Arial, sans-serif;
@@ -387,53 +390,69 @@ function printClientRow(shipmentId) {
                         white-space: pre-line;
                         line-height: 1.8;
                     }
+                    .paid-stamp {
+                        position: absolute;
+                        top: 15%;
+                        right: 10%;
+                        transform: rotate(-30deg);
+                        color: rgba(220, 53, 69, 0.7); /* Bright red with transparency */
+                        font-size: 24px;
+                        font-weight: bold;
+                        font-family: 'Arial Black', sans-serif;
+                        text-align: center;
+                        border: 3px solid rgba(220, 53, 69, 0.7);
+                        border-radius: 8px;
+                        padding: 5px 10px;
+                        z-index: 999;
+                        pointer-events: none;
+                    }
                 </style>
             </head>
             <body>
-                <div class="invoice">
-                    <div class="company-header">
-                        <h1>EURASIA SHIPPING SERVICE LLC</h1>
-                        <div>GATE NUMBER 1</div>
-                        <div>+971 4 239 9390</div>
-                        <div>Info@eurasiass.com</div>
-                        <div>AGENCE EURASIA</div>
-                    </div>
+                ${isPaid ? '<div class="paid-stamp">CARGO 333 PAID</div>' : ''}
+                
+                <div class="company-header">
+                    <h1>EURASIA SHIPPING SERVICE LLC</h1>
+                    <div>GATE NUMBER 1</div>
+                    <div>+971 4 239 9390</div>
+                    <div>Info@eurasiass.com</div>
+                    <div>AGENCE EURASIA</div>
+                </div>
 
-                    <div class="header">
-                        <h2>Container #${containerNumber}</h2>
-                        <p><strong>Client Name:</strong> ${clientName}</p>
-                        <p><strong>Mark:</strong> ${clientMark}</p>
-                        <p><strong>Phone:</strong> ${clientPhone}</p>
-                    </div>
+                <div class="header">
+                    <h2>Container #${containerNumber}</h2>
+                    <p><strong>Client Name:</strong> ${clientName}</p>
+                    <p><strong>Mark:</strong> ${clientMark}</p>
+                    <p><strong>Phone:</strong> ${clientPhone}</p>
+                </div>
 
-                    <table>
-                        <tr>
-                            <th>Volume (m³)</th>
-                            <th>Price (AED)</th>
-                            <th>Extra Charge (AED)</th>
-                            <th>Total (AED)</th>
-                        </tr>
-                        <tr>
-                            <td>${volume}</td>
-                            <td>${price}</td>
-                            <td>${extraCharge}</td>
-                            <td>${total}</td>
-                        </tr>
-                    </table>
-                    <div class="contacts">
-                        <div class="contact-row">
-                            <div class="contact-column">
-                                <h3>Information in Dubai:</h3>
-                                <div class="contact-info">PAPA LALY: +971 55 309 9610
+                <table>
+                    <tr>
+                        <th>Volume (m³)</th>
+                        <th>Price (AED)</th>
+                        <th>Extra Charge (AED)</th>
+                        <th>Total (AED)</th>
+                    </tr>
+                    <tr>
+                        <td>${volume}</td>
+                        <td>${price}</td>
+                        <td>${extraCharge}</td>
+                        <td>${total}</td>
+                    </tr>
+                </table>
+                <div class="contacts">
+                    <div class="contact-row">
+                        <div class="contact-column">
+                            <h3>Information in Dubai:</h3>
+                            <div class="contact-info">PAPA LALY: +971 55 309 9610
 AHMED: +971 55 215 4173</div>
-                            </div>
-                            <div class="contact-column">
-                                <h3>Information in Comoros:</h3>
-                                <div class="contact-info">MOHAMED ABDALLAH: 492 40 19
+                        </div>
+                        <div class="contact-column">
+                            <h3>Information in Comoros:</h3>
+                            <div class="contact-info">MOHAMED ABDALLAH: 492 40 19
 AGENCE IN COMOROS:
 AGENCE ALVARO MORONI BACHA: 
 Tel: 338 91 61</div>
-                            </div>
                         </div>
                     </div>
                 </div>

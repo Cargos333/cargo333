@@ -128,14 +128,20 @@
                                     <td>{{ shipment.volume }}</td>
                                     <td>AED {{ shipment.price|format_number }}</td>
                                     <td>AED {{ shipment.extra_charge|format_number }}</td>
-                                    <td>AED {{ (shipment.price + shipment.extra_charge)|format_number }}</td>
+                                    <td>
+                                        {% if shipment.payment_status == 'partial' %}
+                                            AED {{ shipment.paid_amount|format_number }}
+                                        {% else %}
+                                            AED {{ (shipment.price + shipment.extra_charge)|format_number }}
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if shipment.payment_status == 'unpaid' %}
                                             <span class="badge bg-danger">Unpaid</span>
                                         {% elif shipment.payment_status == 'partial' %}
                                             <span class="badge bg-warning">
                                                 Partial
-                                                (AED {{ shipment.paid_amount|format_number }} / AED {{ (shipment.price + shipment.extra_charge)|format_number }})
+                                                (AED {{ (shipment.price - shipment.paid_amount)|format_number }} remaining)
                                             </span>
                                         {% else %}
                                             <span class="badge bg-success">Paid</span>

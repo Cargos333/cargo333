@@ -84,7 +84,15 @@ def dashboard():
 @app.route('/container/<int:id>')
 @login_required
 def container_details(id):
+    # Load container
     container = Container.query.get_or_404(id)
+    
+    # Load shipments with explicit ordering to ensure consistent display
+    shipments = Shipment.query.filter_by(container_id=id).order_by(Shipment.id).all()
+    
+    # Replace container.shipments with our ordered shipments for the template
+    container.shipments = shipments
+    
     return render_template('container_details.html', container=container)
 
 @app.route('/container/create', methods=['POST'])

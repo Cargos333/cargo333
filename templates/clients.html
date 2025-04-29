@@ -16,6 +16,224 @@
         </div>
     </div>
 
+    {% if search_query %}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Client Summary for "{{ search_query }}"</h5>
+            <button onclick="printClientSummary('{{ search_query }}')" class="btn btn-success btn-sm no-print">
+                <i class="fas fa-print"></i> Print Summary
+            </button>
+        </div>
+        <div class="card-body" id="clientSummaryContent">
+            {% set client_containers = {} %}
+            {% set total_volume = namespace(value=0) %}
+            {% set total_price = namespace(value=0) %}
+            {% set total_paid = namespace(value=0) %}
+            
+            {% for container, clients in active_containers.items() %}
+                {% for client in clients %}
+                    {% if client.mark == search_query or client.name == search_query or client.phone == search_query %}
+                        {% for shipment in client.shipments %}
+                            {% if shipment.container_id == container.id %}
+                                {% if client.id not in client_containers %}
+                                    {% set client_containers = client_containers.update({client.id: []}) or client_containers %}
+                                {% endif %}
+                                {% set _ = client_containers[client.id].append((container, shipment)) %}
+                                {% set total_volume.value = total_volume.value + shipment.volume %}
+                                {% set total_price.value = total_price.value + shipment.price + shipment.extra_charge %}
+                                {% if shipment.payment_status == 'paid' %}
+                                    {% set total_paid.value = total_paid.value + shipment.price + shipment.extra_charge %}
+                                {% elif shipment.payment_status == 'partial' %}
+                                    {% set total_paid.value = total_paid.value + shipment.paid_amount %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            
+            {% for container, clients in history_containers.items() %}
+                {% for client in clients %}
+                    {% if client.mark == search_query or client.name == search_query or client.phone == search_query %}
+                        {% for shipment in client.shipments %}
+                            {% if shipment.container_id == container.id %}
+                                {% if client.id not in client_containers %}
+                                    {% set client_containers = client_containers.update({client.id: []}) or client_containers %}
+                                {% endif %}
+                                {% set _ = client_containers[client.id].append((container, shipment)) %}
+                                {% set total_volume.value = total_volume.value + shipment.volume %}
+                                {% set total_price.value = total_price.value + shipment.price + shipment.extra_charge %}
+                                {% if shipment.payment_status == 'paid' %}
+                                    {% set total_paid.value = total_paid.value + shipment.price + shipment.extra_charge %}
+                                {% elif shipment.payment_status == 'partial' %}
+                                    {% set total_paid.value = total_paid.value + shipment.paid_amount %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            
+            {% if client_containers %}
+                <div class="alert alert-info">
+                    <p><strong>Found in {{ client_containers|length }} container(s)</strong></p>
+                    <p>Total Volume: {{ "%.2f"|format(total_volume.value) }} m³</p>
+                    <p>Total Value: AED {{ total_price.value|format_number }}</p>
+                    <p>Total Paid: AED {{ total_paid.value|format_number }}</p>
+                    <p>Remaining: AED {{ (total_price.value - total_paid.value)|format_number }}</p>
+                </div>
+                
+                <h6 class="mb-3">Details by Container:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Container</th>
+                                <th>Status</th>
+                                <th>Volume</th>
+                                <th>Price</th>
+                                <th>Paid</th>
+                                <th>Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client_id, container_shipments in client_containers.items() %}
+                                {% for container, shipment in container_shipments %}
+                                    <tr>
+                                        <td>{{ container.container_number }}</td>
+                                        <td>
+                                            {% if container.status == 'delivered' %}
+                                                <span class="badge bg-secondary">Delivered</span>
+                                            {% else %}
+                                                <span class="badge bg-primary">Active</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ shipment.volume }} m³</td>
+                                        <td>AED {{ (shipment.price + shipment.extra_charge)|format_number }}</td>
+                                        <td>
+                                            {% if shipment.payment_status == 'paid' %}
+                                                AED {{ (shipment.price + shipment.extra_charge)|format_number }}
+                                            {% elif shipment.payment_status == 'partial' %}
+                                                AED {{ shipment.paid_amount|format_number }}
+                                            {% else %}
+                                                AED 0
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if shipment.payment_status == 'paid' %}
+                                                AED 0
+                                            {% elif shipment.payment_status == 'partial' %}
+                                                AED {{ (shipment.price + shipment.extra_charge - shipment.paid_amount)|format_number }}
+                                            {% else %}
+                                                AED {{ (shipment.price + shipment.extra_charge)|format_number }}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-warning">No exact match found for "{{ search_query }}".</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function printClientSummary(clientMark) {
+        const printWindow = window.open('', '', 'height=600,width=800');
+        const summaryContent = document.getElementById('clientSummaryContent').innerHTML;
+        
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Summary - ${clientMark}</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            padding: 20px;
+                            color: #333;
+                            line-height: 1.5;
+                        }
+                        h1 {
+                            color: #2c3e50;
+                            font-size: 24px;
+                            margin-bottom: 20px;
+                            text-align: center;
+                            border-bottom: 2px solid #2c3e50;
+                            padding-bottom: 10px;
+                        }
+                        .alert-info, .alert-warning {
+                            background-color: #f8f9fa;
+                            border: 1px solid #d1d3e2;
+                            border-radius: 4px;
+                            padding: 15px;
+                            margin-bottom: 20px;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 20px;
+                            margin-bottom: 30px;
+                        }
+                        th, td {
+                            border: 1px solid #ddd;
+                            padding: 8px;
+                            text-align: left;
+                        }
+                        th {
+                            background-color: #f2f2f2;
+                            font-weight: bold;
+                        }
+                        tr:nth-child(even) {
+                            background-color: #f9f9f9;
+                        }
+                        .badge {
+                            padding: 5px 10px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: normal;
+                        }
+                        .bg-secondary {
+                            background-color: #6c757d;
+                            color: white;
+                        }
+                        .bg-primary {
+                            background-color: #007bff;
+                            color: white;
+                        }
+                        .header-info {
+                            text-align: center;
+                            margin-bottom: 20px;
+                        }
+                        @page {
+                            size: portrait;
+                            margin: 2cm;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header-info">
+                        <h1>Client Summary - ${clientMark}</h1>
+                        <p>Date: ${new Date().toLocaleDateString()}</p>
+                    </div>
+                    ${summaryContent}
+                </body>
+            </html>
+        `);
+        
+        printWindow.document.close();
+        printWindow.focus();
+        
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 250);
+    }
+    </script>
+    {% endif %}
+
     <!-- Active Containers -->
     <h2 class="mb-3">Active Containers</h2>
     <div class="accordion mb-5" id="activeAccordion">
@@ -114,4 +332,39 @@
         {% endfor %}
     </div>
 </div>
+
+<style>
+@media print {
+    .navbar, 
+    .card-header,
+    form,
+    .no-print,
+    h1, h2,
+    .accordion {
+        display: none !important;
+    }
+    
+    #clientSummaryContent {
+        display: block !important;
+    }
+    
+    .container {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 0 !important;
+    }
+    
+    .card {
+        border: none !important;
+    }
+    
+    .card-body {
+        padding: 0 !important;
+    }
+    
+    @page {
+        margin: 1.5cm;
+    }
+}
+</style>
 {% endblock %}

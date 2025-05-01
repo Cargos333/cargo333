@@ -151,7 +151,13 @@
                         <input type="number" step="0.01" class="form-control edit-mode d-none" name="extra_charge" value="{{ shipment.extra_charge }}">
                     </td>
                     <td>
-                        <span class="view-mode">{{ (shipment.price + shipment.extra_charge)|format_number }} AED</span>
+                        <span class="view-mode">
+                            {% if shipment.payment_status == 'partial' %}
+                                {{ shipment.paid_amount|format_number }} AED
+                            {% else %}
+                                {{ (shipment.price + shipment.extra_charge)|format_number }} AED
+                            {% endif %}
+                        </span>
                     </td>
                     <td>
                         <span class="view-mode">{{ shipment.payment_status }}</span>

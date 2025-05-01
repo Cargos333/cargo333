@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash, send_file
+from flask import render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_config import app, db
@@ -705,6 +705,53 @@ def download_connaissement(id):
         as_attachment=True,
         download_name=container.pdf_filename or 'connaissement.pdf'
     )
+
+@app.route('/api/search-clients')
+@login_required
+def search_clients():
+    search_term = request.args.get('term', '').strip()
+    
+    if len(search_term) < 2:
+        return jsonify([])
+    
+    # Search for clients across all active and delivered containers
+    results = db.session.query(
+        Client.mark, 
+        Client.name, 
+        Client.phone,
+        Container.container_number,
+        Container.id.label('container_id'),
+        Container.status.label('container_status'),
+        Shipment.volume,
+        Shipment.payment_status,
+        Shipment.paid_amount
+    ).join(
+        Shipment, Client.id == Shipment.client_id
+    ).join(
+        Container, Shipment.container_id == Container.id
+    ).filter(
+        db.or_(
+            Client.mark.ilike(f'%{search_term}%'),
+            Client.name.ilike(f'%{search_term}%'),
+            Client.phone.ilike(f'%{search_term}%')
+        )
+    ).all()
+    
+    # Format results for JSON response
+    formatted_results = []
+    for result in results:
+        formatted_results.append({
+            'mark': result.mark,
+            'name': result.name,
+            'phone': result.phone,
+            'container_number': result.container_number,
+            'container_id': result.container_id,
+            'container_status': result.container_status,
+            'volume': round(result.volume, 2),
+            'payment_status': result.payment_status
+        })
+    
+    return jsonify(formatted_results)
 
 if __name__ == '__main__':
     with app.app_context():

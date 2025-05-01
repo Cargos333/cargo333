@@ -38,6 +38,42 @@
             </div>
         </div>
     </div>
+    
+    <!-- Client Search Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title">Find Client</h5>
+        </div>
+        <div class="card-body">
+            <form id="clientSearchForm" class="d-flex">
+                <input type="text" id="clientSearch" class="form-control me-2" placeholder="Search by client mark, name or phone...">
+                <button type="submit" class="btn btn-primary">Search</button>
+            </form>
+            
+            <div id="searchResults" class="mt-3" style="display: none;">
+                <h6>Search Results:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Client Mark</th>
+                                <th>Client Name</th>
+                                <th>Phone</th>
+                                <th>Container</th>
+                                <th>Volume</th>
+                                <th>Payment Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchResultsBody">
+                            <!-- Results will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                <button id="clearSearch" class="btn btn-secondary btn-sm">Clear Results</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Containers List -->
     <h2 class="mb-3">Recent Containers</h2>
@@ -153,5 +189,79 @@ function toggleEdit(containerId) {
         editDiv.style.display = 'block';
     }
 }
+
+document.getElementById('clientSearchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const searchTerm = document.getElementById('clientSearch').value.trim();
+    if (searchTerm.length < 2) {
+        alert('Please enter at least 2 characters to search');
+        return;
+    }
+    
+    // Send fetch request to new API endpoint
+    fetch(`/api/search-clients?term=${encodeURIComponent(searchTerm)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultsDiv = document.getElementById('searchResults');
+            const resultsBody = document.getElementById('searchResultsBody');
+            
+            // Clear previous results
+            resultsBody.innerHTML = '';
+            
+            if (data.length === 0) {
+                resultsBody.innerHTML = '<tr><td colspan="7" class="text-center">No clients found</td></tr>';
+            } else {
+                // Add each result to the table
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    // Add payment status class
+                    if (item.payment_status === 'paid') {
+                        row.classList.add('table-success');
+                    } else if (item.payment_status === 'partial') {
+                        row.classList.add('table-warning');
+                    } else {
+                        row.classList.add('table-light');
+                    }
+                    
+                    row.innerHTML = `
+                        <td>${item.mark}</td>
+                        <td>${item.name}</td>
+                        <td>${item.phone || ''}</td>
+                        <td>
+                            <span class="badge ${item.container_status === 'delivered' ? 'bg-secondary' : 'bg-primary'}">
+                                ${item.container_number}
+                            </span>
+                        </td>
+                        <td>${item.volume} m³</td>
+                        <td>
+                            <span class="badge ${
+                                item.payment_status === 'paid' ? 'bg-success' : 
+                                item.payment_status === 'partial' ? 'bg-warning' : 'bg-danger'
+                            }">
+                                ${item.payment_status}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="/container/${item.container_id}" class="btn btn-sm btn-primary">View Container</a>
+                        </td>
+                    `;
+                    resultsBody.appendChild(row);
+                });
+            }
+            
+            // Show results
+            resultsDiv.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error searching clients:', error);
+            alert('An error occurred while searching. Please try again.');
+        });
+});
+
+document.getElementById('clearSearch').addEventListener('click', function() {
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('clientSearch').value = '';
+});
 </script>
 {% endblock %}

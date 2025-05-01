@@ -144,7 +144,7 @@
                     </td>
                     <td>
                         <span class="view-mode">{{ shipment.price|format_number }} AED</span>
-                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="price" value="{{ shipment.price }}">
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="price" value="{{ shipment.price }}" readonly>
                     </td>
                     <td>
                         <span class="view-mode">{{ shipment.extra_charge|format_number }} AED</span>
@@ -305,10 +305,15 @@ function printClientRow(shipmentId) {
     const clientMark = row.querySelector('td:nth-child(1) .view-mode').textContent;
     const clientPhone = row.querySelector('td:nth-child(3) .view-mode').textContent;
     const volume = row.querySelector('td:nth-child(4) .view-mode').textContent;
-    const price = row.querySelector('td:nth-child(5) .view-mode').textContent;
-    const extraCharge = row.querySelector('td:nth-child(6) .view-mode').textContent;
-    const total = row.querySelector('td:nth-child(7) .view-mode').textContent;
+    const price = row.querySelector('td:nth-child(5) .view-mode').textContent.replace('AED', '').trim();
+    const extraCharge = row.querySelector('td:nth-child(6) .view-mode').textContent.replace('AED', '').trim();
     const paymentStatus = row.querySelector('td:nth-child(8) .view-mode').textContent;
+    
+    // Calculate the actual full total (price + extra charge)
+    const priceValue = parseFloat(price.replace(',', '')) || 0;
+    const extraChargeValue = parseFloat(extraCharge.replace(',', '')) || 0;
+    const fullTotal = priceValue + extraChargeValue;
+    const formattedFullTotal = `AED ${fullTotal.toLocaleString()}`;
     
     const isPaid = paymentStatus.trim() === 'paid';
     const isPartial = paymentStatus.trim() === 'partial';
@@ -320,9 +325,8 @@ function printClientRow(shipmentId) {
         const paidInput = row.querySelector('input[name="paid_amount"]');
         if (paidInput) {
             const paid = parseFloat(paidInput.value) || 0;
-            const totalValue = parseFloat(total.replace('AED', '').trim().replace(',', '')) || 0;
             paidAmount = `AED ${paid.toLocaleString()}`;
-            remainingAmount = `AED ${(totalValue - paid).toLocaleString()}`;
+            remainingAmount = `AED ${(fullTotal - paid).toLocaleString()}`;
         }
     }
     
@@ -498,7 +502,7 @@ function printClientRow(shipmentId) {
                     </tr>
                     <tr>
                         <td>${volume}</td>
-                        <td>${total}</td>
+                        <td>${formattedFullTotal}</td>
                     </tr>
                 </table>
                 
@@ -512,7 +516,7 @@ function printClientRow(shipmentId) {
                             <th>Remaining Amount</th>
                         </tr>
                         <tr>
-                            <td>${total}</td>
+                            <td>${formattedFullTotal}</td>
                             <td>${paidAmount}</td>
                             <td>${remainingAmount}</td>
                         </tr>

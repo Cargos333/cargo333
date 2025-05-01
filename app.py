@@ -65,10 +65,12 @@ def dashboard():
     if current_user.role == 'Manager':
         return redirect(url_for('container_search'))
         
-    containers = Container.query.filter(Container.status != 'delivered').all()
+    # Use a consistent ordering by id instead of status-based ordering
+    containers = Container.query.filter(Container.status != 'delivered').order_by(Container.id.desc()).all()
+    
+    # Keep the rest of the stats calculation the same
     total_containers = Container.query.count()
     active_containers = Container.query.filter(Container.status != 'delivered').count()
-    # Count unique client marks
     total_clients = db.session.query(Client.mark).distinct().count()
     total_delivered = Container.query.filter_by(status='delivered').count()
     

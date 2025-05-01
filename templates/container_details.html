@@ -305,10 +305,26 @@ function printClientRow(shipmentId) {
     const clientMark = row.querySelector('td:nth-child(1) .view-mode').textContent;
     const clientPhone = row.querySelector('td:nth-child(3) .view-mode').textContent;
     const volume = row.querySelector('td:nth-child(4) .view-mode').textContent;
+    const price = row.querySelector('td:nth-child(5) .view-mode').textContent;
+    const extraCharge = row.querySelector('td:nth-child(6) .view-mode').textContent;
     const total = row.querySelector('td:nth-child(7) .view-mode').textContent;
     const paymentStatus = row.querySelector('td:nth-child(8) .view-mode').textContent;
     
     const isPaid = paymentStatus.trim() === 'paid';
+    const isPartial = paymentStatus.trim() === 'partial';
+    
+    // Get paid amount for partial payments
+    let paidAmount = '';
+    let remainingAmount = '';
+    if (isPartial) {
+        const paidInput = row.querySelector('input[name="paid_amount"]');
+        if (paidInput) {
+            const paid = parseFloat(paidInput.value) || 0;
+            const totalValue = parseFloat(total.replace('AED', '').trim().replace(',', '')) || 0;
+            paidAmount = `AED ${paid.toLocaleString()}`;
+            remainingAmount = `AED ${(totalValue - paid).toLocaleString()}`;
+        }
+    }
     
     const printWindow = window.open('', '', 'height=600,width=800');
     
@@ -428,6 +444,30 @@ function printClientRow(shipmentId) {
                         color: #198754;
                         border: 1px solid #198754;
                     }
+                    .payment-details {
+                        margin-top: 20px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        padding: 15px;
+                        background-color: #f9f9f9;
+                    }
+                    
+                    .payment-details table {
+                        width: 100%;
+                        margin-top: 10px;
+                    }
+                    
+                    .payment-details th {
+                        background-color: #f2f2f2;
+                        color: #333;
+                        text-align: left;
+                    }
+                    
+                    .payment-details .title {
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                        color: #2c3e50;
+                    }
                 </style>
             </head>
             <body>
@@ -461,6 +501,25 @@ function printClientRow(shipmentId) {
                         <td>${total}</td>
                     </tr>
                 </table>
+                
+                ${isPartial ? `
+                <div class="payment-details">
+                    <div class="title">Payment Details:</div>
+                    <table>
+                        <tr>
+                            <th>Total Amount</th>
+                            <th>Paid Amount</th>
+                            <th>Remaining Amount</th>
+                        </tr>
+                        <tr>
+                            <td>${total}</td>
+                            <td>${paidAmount}</td>
+                            <td>${remainingAmount}</td>
+                        </tr>
+                    </table>
+                </div>
+                ` : ''}
+                
                 <div class="contacts">
                     <div class="contact-row">
                         <div class="contact-column">

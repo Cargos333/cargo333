@@ -645,21 +645,88 @@ def upload_products(id):
         # Read Excel file
         df = pd.read_excel(file)
         
+        # Define column mappings (English -> Application fields)
+        column_mappings = {
+            # English columns
+            'Reference': 'Reference',
+            'Quantity': 'Quantity',
+            'Length': 'Length',
+            'Width': 'Width',
+            'Height': 'Height',
+            # French columns
+            'Items': 'Reference',
+            'Longueur': 'Length',
+            'Largeur': 'Width',
+            'Hauteur': 'Height',
+            'Qty': 'Quantity',
+            'Volume': 'Volume'
+        }
+        
+        # Rename columns based on mappings
+        df_columns = df.columns.tolist()
+        rename_dict = {}
+        
+        for col in df_columns:
+            if col in column_mappings:
+                rename_dict[col] = column_mappings[col]
+        
+        if rename_dict:
+            df = df.rename(columns=rename_dict)
+        
         # Process each row
+        processed_count = 0
         for _, row in df.iterrows():
+            # Get reference (required field)
+            if 'Reference' not in df.columns or pd.isna(row.get('Reference')):
+                continue  # Skip rows without a reference
+                
+            reference = str(row.get('Reference', ''))
+            
+            # Get other fields with defaults
+            try:
+                quantity = int(row.get('Quantity')) if pd.notna(row.get('Quantity')) else 1
+            except (ValueError, TypeError):
+                quantity = 1
+                
+            try:
+                length = float(row.get('Length')) if pd.notna(row.get('Length')) else 0
+            except (ValueError, TypeError):
+                length = 0
+                
+            try:
+                width = float(row.get('Width')) if pd.notna(row.get('Width')) else 0
+            except (ValueError, TypeError):
+                width = 0
+                
+            try:
+                height = float(row.get('Height')) if pd.notna(row.get('Height')) else 0
+            except (ValueError, TypeError):
+                height = 0
+            
+            # Calculate volume or use 0 if any dimension is missing
+            if length > 0 and width > 0 and height > 0:
+                volume = length * width * height * quantity
+            else:
+                # Use Volume field if available, otherwise 0
+                try:
+                    volume = float(row.get('Volume')) if pd.notna(row.get('Volume')) else 0
+                except (ValueError, TypeError):
+                    volume = 0
+            
             product = Product(
                 client_id=id,
-                reference=str(row['Reference']),
-                quantity=int(row['Quantity']),
-                length=float(row['Length']),
-                width=float(row['Width']),
-                height=float(row['Height']),
-                volume=float(row['Length']) * float(row['Width']) * float(row['Height']) * int(row['Quantity'])
+                reference=reference,
+                quantity=quantity,
+                length=length,
+                width=width,
+                height=height,
+                volume=volume
             )
             db.session.add(product)
+            processed_count += 1
         
         db.session.commit()
-        flash(f'Successfully imported {len(df)} products')
+        flash(f'Successfully imported {processed_count} products')
         
     except Exception as e:
         db.session.rollback()

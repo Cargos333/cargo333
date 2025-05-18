@@ -80,10 +80,25 @@
     <!-- Products Table -->
     <div class="card">
         <div class="card-body">
+            {% if not container_delivered and products %}
+            <div class="mb-3 no-print">
+                <button id="delete-selected" class="btn btn-danger" disabled onclick="deleteSelected()">
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+                <button id="select-all" class="btn btn-outline-secondary" onclick="toggleSelectAll()">
+                    <i class="fas fa-check-square"></i> Select All
+                </button>
+            </div>
+            {% endif %}
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
+                            {% if not container_delivered %}
+                            <th class="no-print" style="width: 40px;">
+                                <input type="checkbox" id="select-all-checkbox" onchange="selectAllCheckboxes(this.checked)">
+                            </th>
+                            {% endif %}
                             <th>Reference</th>
                             <th>Quantity</th>
                             <th>Length (m)</th>
@@ -98,6 +113,11 @@
                     <tbody>
                         {% for product in products %}
                         <tr id="row-{{ product.id }}">
+                            {% if not container_delivered %}
+                            <td class="no-print">
+                                <input type="checkbox" class="product-select" data-id="{{ product.id }}" onchange="updateDeleteButton()">
+                            </td>
+                            {% endif %}
                             <td>
                                 <span class="view-mode">{{ product.reference }}</span>
                                 <input type="text" class="form-control edit-mode d-none" value="{{ product.reference }}" name="reference">
@@ -137,7 +157,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="table-secondary">
-                            <td colspan="5" class="print-colspan"><strong>Total Volume</strong></td>
+                            <td {% if not container_delivered %}colspan="6"{% else %}colspan="5"{% endif %} class="print-colspan"><strong>Total Volume</strong></td>
                             <td><strong>{{ "%.2f"|format(products|sum(attribute='volume')) }} m³</strong></td>
                             <td></td>
                         </tr>
@@ -262,6 +282,79 @@ function printProducts() {
     setTimeout(() => {
         footerCell.setAttribute('colspan', footerCell.dataset.originalColspan);
     }, 500);
+}
+
+function selectAllCheckboxes(checked) {
+    document.querySelectorAll('.product-select').forEach(checkbox => {
+        checkbox.checked = checked;
+    });
+    updateDeleteButton();
+}
+
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+    selectAllCheckbox.checked = !selectAllCheckbox.checked;
+    selectAllCheckboxes(selectAllCheckbox.checked);
+    
+    const selectAllButton = document.getElementById('select-all');
+    if (selectAllCheckbox.checked) {
+        selectAllButton.textContent = 'Unselect All';
+        selectAllButton.classList.replace('btn-outline-secondary', 'btn-secondary');
+    } else {
+        selectAllButton.innerHTML = '<i class="fas fa-check-square"></i> Select All';
+        selectAllButton.classList.replace('btn-secondary', 'btn-outline-secondary');
+    }
+}
+
+function updateDeleteButton() {
+    const selectedCount = document.querySelectorAll('.product-select:checked').length;
+    const deleteButton = document.getElementById('delete-selected');
+    
+    if (selectedCount > 0) {
+        deleteButton.removeAttribute('disabled');
+        deleteButton.innerHTML = `<i class="fas fa-trash"></i> Delete Selected (${selectedCount})`;
+    } else {
+        deleteButton.setAttribute('disabled', 'disabled');
+        deleteButton.innerHTML = '<i class="fas fa-trash"></i> Delete Selected';
+    }
+}
+
+function deleteSelected() {
+    const selectedIds = [];
+    document.querySelectorAll('.product-select:checked').forEach(checkbox => {
+        selectedIds.push(checkbox.dataset.id);
+    });
+    
+    if (selectedIds.length === 0) return;
+    
+    if (confirm(`Are you sure you want to delete ${selectedIds.length} selected products?`)) {
+        // Create a form to submit the selected IDs
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{{ url_for('delete_multiple_products', client_id=client.id) }}";
+        
+        // Add CSRF token if your app uses it
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+        }
+        
+        // Add selected IDs as a hidden input
+        const idsInput = document.createElement('input');
+        idsInput.type = 'hidden';
+        idsInput.name = 'product_ids';
+        idsInput.value = selectedIds.join(',');
+        form.appendChild(idsInput);
+        
+        // Submit the form
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
 }
 </script>
 {% endblock %}

@@ -555,6 +555,40 @@ def delete_product(id):
         db.session.rollback()
         return f"Error deleting product: {str(e)}", 400
 
+@app.route('/client/<int:client_id>/delete_products', methods=['POST'])
+@login_required
+def delete_multiple_products(client_id):
+    try:
+        client = Client.query.get_or_404(client_id)
+        
+        # Get product IDs from form
+        product_ids_str = request.form.get('product_ids', '')
+        if not product_ids_str:
+            flash('No products selected')
+            return redirect(url_for('client_products', id=client_id))
+        
+        # Convert comma-separated string to list of IDs
+        product_ids = [int(id) for id in product_ids_str.split(',') if id.strip().isdigit()]
+        
+        # Query products belonging to this client and with matching IDs
+        products = Product.query.filter(
+            Product.client_id == client_id,
+            Product.id.in_(product_ids)
+        ).all()
+        
+        count = len(products)
+        for product in products:
+            db.session.delete(product)
+        
+        db.session.commit()
+        flash(f'Successfully deleted {count} products')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting products: {str(e)}')
+    
+    return redirect(url_for('client_products', id=client_id))
+
 @app.route('/download-template')
 @login_required
 def download_template():

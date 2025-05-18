@@ -121,6 +121,26 @@ def create_container():
     
     return redirect(url_for('dashboard'))
 
+# Add this utility function to ensure consistent price calculation
+def calculate_client_price(container_price, container_volume, client_volume, extra_charge=0):
+    """
+    Calculate client price based on container price and volume
+    Uses the same logic in both back-end and front-end
+    """
+    # Ensure all values are floats and avoid division by zero
+    container_price = float(container_price)
+    container_volume = max(float(container_volume), 0.001)  # Avoid division by zero
+    client_volume = float(client_volume)
+    extra_charge = float(extra_charge) if extra_charge else 0
+    
+    # Calculate base price using the proportion of volume
+    base_price = round((container_price / container_volume) * client_volume)
+    
+    # Add extra charge to get total price
+    total_price = base_price + extra_charge
+    
+    return base_price, round(total_price)
+
 @app.route('/container/<int:id>/add_client', methods=['POST'])
 @login_required
 def add_client_to_container(id):
@@ -134,22 +154,25 @@ def add_client_to_container(id):
         
         # Validate numeric inputs
         volume = request.form.get('volume', '')
-        price = request.form.get('price', '')
-        paid_amount = request.form.get('paid_amount', '0')
+        extra_charge = float(request.form.get('extra_charge', 0))
         
         # Convert to float with validation
         try:
             volume = float(volume) if volume else 0.0
-            price = float(price) if price else 0.0
-            paid_amount = float(paid_amount) if paid_amount else 0.0
+            price, total_price = calculate_client_price(container.price, container.total_volume, volume, extra_charge)
         except ValueError:
-            return "Please enter valid numbers for volume, price, and paid amount", 400
+            return "Please enter valid numbers for volume and extra charge", 400
         
         payment_status = request.form.get('payment_status', 'unpaid')
-        extra_charge = float(request.form.get('extra_charge', 0))
+        paid_amount = request.form.get('paid_amount', '0')
         
+        try:
+            paid_amount = float(paid_amount) if paid_amount else 0.0
+        except ValueError:
+            return "Please enter a valid number for paid amount", 400
+            
         # Validate required fields
-        if not name or not mark or volume <= 0 or price <= 0:
+        if not name or not mark or volume <= 0:
             return "Please fill all required fields with valid values", 400
             
         # Create new client
@@ -164,7 +187,7 @@ def add_client_to_container(id):
             price=price,
             extra_charge=extra_charge,
             payment_status=payment_status,
-            paid_amount=paid_amount if payment_status == 'partial' else (price if payment_status == 'paid' else 0)
+            paid_amount=paid_amount if payment_status == 'partial' else (price + extra_charge if payment_status == 'paid' else 0)
         )
         
         db.session.add(shipment)
@@ -263,6 +286,7 @@ def edit_shipment(id):
     try:
         shipment = Shipment.query.get_or_404(id)
         client = shipment.client
+        container = shipment.container
         
         # Update client info
         client.name = request.form.get('client_name')
@@ -270,9 +294,15 @@ def edit_shipment(id):
         client.phone = request.form.get('client_phone')
         
         # Update shipment info
-        shipment.volume = float(request.form.get('volume'))
-        shipment.price = float(request.form.get('price'))
-        shipment.extra_charge = float(request.form.get('extra_charge', 0))
+        new_volume = float(request.form.get('volume'))
+        extra_charge = float(request.form.get('extra_charge', 0))
+        
+        # Use the common price calculation function
+        base_price, _ = calculate_client_price(container.price, container.total_volume, new_volume)
+        
+        shipment.volume = new_volume
+        shipment.price = base_price  # Use calculated base price
+        shipment.extra_charge = extra_charge
         
         # Update payment info
         payment_status = request.form.get('payment_status')
@@ -582,12 +612,16 @@ def upload_excel(id):
             )
             db.session.add(client)
             
+            client_volume = float(row['Volume'])
+            # Use the common price calculation function
+            base_price, _ = calculate_client_price(container.price, container.total_volume, client_volume)
+            
             # Create shipment
             shipment = Shipment(
                 client=client,
                 container=container,
-                volume=float(row['Volume']),
-                price=round((container.price / container.total_volume) * float(row['Volume'])),
+                volume=client_volume,
+                price=base_price,  # Use calculated base price
                 payment_status='unpaid'
             )
             db.session.add(shipment)

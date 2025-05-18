@@ -225,15 +225,49 @@ document.getElementById('client_mark').addEventListener('blur', function() {
     }
 });
 
+/**
+ * Calculate client price based on container price and volume
+ * This matches the back-end calculation for consistency
+ */
+function calculateClientPrice(containerPrice, containerVolume, clientVolume, extraCharge = 0) {
+    // Ensure all values are numbers and avoid division by zero
+    containerPrice = parseFloat(containerPrice) || 0;
+    containerVolume = Math.max(parseFloat(containerVolume) || 0.001, 0.001); // Avoid division by zero
+    clientVolume = parseFloat(clientVolume) || 0;
+    extraCharge = parseFloat(extraCharge) || 0;
+    
+    // Calculate base price using the proportion of volume
+    const basePrice = Math.round((containerPrice / containerVolume) * clientVolume);
+    
+    // Add extra charge to get total price
+    const totalPrice = basePrice + extraCharge;
+    
+    return {
+        basePrice: basePrice,
+        totalPrice: Math.round(totalPrice)
+    };
+}
+
 function calculatePrice() {
     const containerPrice = {{ container.price }};
     const containerVolume = {{ container.total_volume }};
     const clientVolume = parseFloat(document.getElementById('volume').value) || 0;
     const extraCharge = parseFloat(document.getElementById('extra_charge').value) || 0;
     
-    const basePrice = Math.round((containerPrice / containerVolume) * clientVolume);
-    const totalPrice = Math.round(basePrice + extraCharge);
-    document.getElementById('price').value = totalPrice;
+    const result = calculateClientPrice(containerPrice, containerVolume, clientVolume, extraCharge);
+    document.getElementById('price').value = result.basePrice;
+}
+
+function recalculatePrice(volumeInput) {
+    const containerPrice = {{ container.price }};
+    const containerVolume = {{ container.total_volume }};
+    const clientVolume = parseFloat(volumeInput.value) || 0;
+    const row = volumeInput.closest('tr');
+    const priceInput = row.querySelector('input[name="price"]');
+    const extraChargeInput = row.querySelector('input[name="extra_charge"]');
+    
+    const result = calculateClientPrice(containerPrice, containerVolume, clientVolume);
+    priceInput.value = result.basePrice;
 }
 
 function toggleEditMode(shipmentId) {
@@ -243,17 +277,6 @@ function toggleEditMode(shipmentId) {
     
     viewElements.forEach(el => el.classList.toggle('d-none'));
     editElements.forEach(el => el.classList.toggle('d-none'));
-}
-
-function recalculatePrice(volumeInput) {
-    const containerPrice = {{ container.price }};
-    const containerVolume = {{ container.total_volume }};
-    const clientVolume = parseFloat(volumeInput.value) || 0;
-    const row = volumeInput.closest('tr');
-    const priceInput = row.querySelector('input[name="price"]');
-    
-    const price = Math.round((containerPrice / containerVolume) * clientVolume);
-    priceInput.value = price;
 }
 
 function saveShipment(shipmentId) {

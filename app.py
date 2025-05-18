@@ -781,7 +781,7 @@ def search_clients():
     if len(search_term) < 2:
         return jsonify([])
     
-    # Search for clients across all active and delivered containers
+    # Search for clients across only active containers (not delivered)
     results = db.session.query(
         Client.mark, 
         Client.name, 
@@ -797,10 +797,13 @@ def search_clients():
     ).join(
         Container, Shipment.container_id == Container.id
     ).filter(
-        db.or_(
-            Client.mark.ilike(f'%{search_term}%'),
-            Client.name.ilike(f'%{search_term}%'),
-            Client.phone.ilike(f'%{search_term}%')
+        db.and_(
+            Container.status != 'delivered',  # Only show active containers
+            db.or_(
+                Client.mark.ilike(f'%{search_term}%'),
+                Client.name.ilike(f'%{search_term}%'),
+                Client.phone.ilike(f'%{search_term}%')
+            )
         )
     ).all()
     
@@ -828,16 +831,23 @@ def client_autocomplete():
     if len(term) < 2:
         return jsonify([])
     
-    # Search for clients by mark, name, and phone
+    # Search for clients by mark, name, and phone, but only from active containers
     clients = db.session.query(
         Client.mark, 
         Client.name, 
         Client.phone
+    ).join(
+        Shipment, Client.id == Shipment.client_id
+    ).join(
+        Container, Shipment.container_id == Container.id
     ).filter(
-        db.or_(
-            Client.mark.ilike(f'%{term}%'),
-            Client.name.ilike(f'%{term}%'),
-            Client.phone.ilike(f'%{term}%')
+        db.and_(
+            Container.status != 'delivered',  # Exclude delivered containers
+            db.or_(
+                Client.mark.ilike(f'%{term}%'),
+                Client.name.ilike(f'%{term}%'),
+                Client.phone.ilike(f'%{term}%')
+            )
         )
     ).distinct().limit(20).all()
     
@@ -857,6 +867,25 @@ def client_autocomplete():
         })
     
     return jsonify(results)
+
+@app.route('/api/shipment-details/<int:id>')
+@login_required
+def get_shipment_details(id):
+    """API endpoint to get shipment details for printing receipts"""
+    try:
+        shipment = Shipment.query.get_or_404(id)
+        total = shipment.price + shipment.extra_charge
+        
+        return jsonify({
+            'total': total,
+            'price': shipment.price,
+            'extra_charge': shipment.extra_charge,
+            'payment_status': shipment.payment_status,
+            'paid_amount': shipment.paid_amount if shipment.paid_amount else 0,
+            'volume': shipment.volume
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():

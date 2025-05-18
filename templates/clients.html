@@ -110,28 +110,6 @@
                 {% endfor %}
             {% endfor %}
             
-            {% for container, clients in history_containers.items() %}
-                {% for client in clients %}
-                    {% if client.mark == search_query or client.name == search_query or client.phone == search_query %}
-                        {% for shipment in client.shipments %}
-                            {% if shipment.container_id == container.id %}
-                                {% if client.id not in client_containers %}
-                                    {% set client_containers = client_containers.update({client.id: []}) or client_containers %}
-                                {% endif %}
-                                {% set _ = client_containers[client.id].append((container, shipment)) %}
-                                {% set total_volume.value = total_volume.value + shipment.volume %}
-                                {% set total_price.value = total_price.value + shipment.price + shipment.extra_charge %}
-                                {% if shipment.payment_status == 'paid' %}
-                                    {% set total_paid.value = total_paid.value + shipment.price + shipment.extra_charge %}
-                                {% elif shipment.payment_status == 'partial' %}
-                                    {% set total_paid.value = total_paid.value + shipment.paid_amount %}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                    {% endif %}
-                {% endfor %}
-            {% endfor %}
-            
             {% if client_containers %}
                 <div class="alert alert-info">
                     <p><strong>Found in {{ client_containers|length }} container(s)</strong></p>

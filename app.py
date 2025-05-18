@@ -425,8 +425,8 @@ def container_search():
     selected_container = None
     containers_by_destination = {}
     
-    # Get all active containers grouped by destination
-    all_containers = Container.query.filter(Container.status != 'delivered').all()
+    # Get all active containers in descending order by ID
+    all_containers = Container.query.filter(Container.status != 'delivered').order_by(Container.id.desc()).all()
     for container in all_containers:
         if container.destination not in containers_by_destination:
             containers_by_destination[container.destination] = []

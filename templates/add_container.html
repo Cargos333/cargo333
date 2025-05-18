@@ -16,11 +16,9 @@
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="container_type" class="form-label">Container Type</label>
-                        <select class="form-select" id="container_type" name="container_type" required>
+                        <select class="form-select" id="container_type" name="container_type" required onchange="updateVolumeAndPrice()">
                             <option value="20ft">20ft Standard</option>
                             <option value="40ft">40ft Standard</option>
-                            <option value="40ft HC">40ft High Cube</option>
-                            <option value="45ft HC">45ft High Cube</option>
                         </select>
                     </div>
                     <div class="col-md-3 mb-3">
@@ -34,8 +32,8 @@
                     <div class="col-md-3 mb-3">
                         <label for="destination" class="form-label">Destination</label>
                         <select class="form-select" id="destination" name="destination" required>
-                            <option value="Mutsamudu">Mutsamudu</option>
                             <option value="Moroni">Moroni</option>
+                            <option value="Mutsamudu">Mutsamudu</option>
                         </select>
                     </div>
                 </div>
@@ -44,4 +42,34 @@
         </div>
     </div>
 </div>
+
+<script>
+// Container type specifications
+const containerSpecs = {
+    '20ft': {
+        volume: 33,
+        price: 25100
+    },
+    '40ft': {
+        volume: 76,
+        price: 42500
+    }
+};
+
+// Function to update volume and price based on container type
+function updateVolumeAndPrice() {
+    const containerType = document.getElementById('container_type').value;
+    const specs = containerSpecs[containerType];
+    
+    if (specs) {
+        document.getElementById('total_volume').value = specs.volume;
+        document.getElementById('price').value = specs.price;
+    }
+}
+
+// Set default values when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    updateVolumeAndPrice();
+});
+</script>
 {% endblock %}

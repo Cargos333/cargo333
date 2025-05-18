@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Payments Tracker</h1>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Pending Payments</h5>
+                    <h2>{{ total_items }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Partial Payments</h5>
+                    <h2>{{ partial_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Fully Unpaid</h5>
+                    <h2>{{ unpaid_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Outstanding</h5>
+                    <h2>AED {{ total_unpaid|format_number }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('payments_tracker') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           placeholder="Client name, mark, phone or container #" value="{{ search_query }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="container" class="form-label">Container</label>
+                    <select class="form-select" id="container" name="container">
+                        <option value="">All Containers</option>
+                        {% for container in containers %}
+                            <option value="{{ container.id }}" {% if container_filter == container.id|string %}selected{% endif %}>
+                                #{{ container.container_number }} 
+                                {% if container.status == 'delivered' %}(Delivered){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="payment_status" class="form-label">Payment Status</label>
+                    <select class="form-select" id="payment_status" name="payment_status">
+                        <option value="">All Pending</option>
+                        <option value="partial" {% if payment_filter == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="unpaid" {% if payment_filter == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">Filter</button>
+                    <a href="{{ url_for('payments_tracker') }}" class="btn btn-secondary">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Results Table -->
+    <div class="card">
+        <div class="card-body">
+            {% if results %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Container</th>
+                                <th>Status</th>
+                                <th>Client Mark</th>
+                                <th>Client Name</th>
+                                <th>Phone</th>
+                                <th>Volume</th>
+                                <th>Total Price</th>
+                                <th>Payment Status</th>
+                                <th>Paid Amount</th>
+                                <th>Remaining</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for shipment, client, container in results %}
+                                {% set total_price = shipment.price + shipment.extra_charge %}
+                                {% set remaining = total_price - (shipment.paid_amount or 0) %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('container_details', id=container.id) }}">
+                                            {{ container.container_number }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if container.status == 'delivered' %}
+                                            <span class="badge bg-secondary">Delivered</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ client.mark }}</td>
+                                    <td>{{ client.name }}</td>
+                                    <td>{{ client.phone }}</td>
+                                    <td>{{ shipment.volume }} m³</td>
+                                    <td>AED {{ total_price|format_number }}</td>
+                                    <td>
+                                        {% if shipment.payment_status == 'partial' %}
+                                            <span class="badge bg-warning text-dark">Partial</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Unpaid</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>AED {{ (shipment.paid_amount or 0)|format_number }}</td>
+                                    <td>AED {{ remaining|format_number }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-success btn-sm" 
+                                                    onclick="confirmMarkAsPaid({{ shipment.id }}, '{{ client.mark }}')">
+                                                <i class="fas fa-check"></i> Mark Paid
+                                            </button>
+                                            <button type="button" class="btn btn-warning btn-sm" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#partialPaymentModal" 
+                                                    onclick="setupPartialPayment({{ shipment.id }}, '{{ client.mark }}', {{ total_price }}, {{ shipment.paid_amount or 0 }})">
+                                                <i class="fas fa-dollar-sign"></i> Update
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <p>No pending payments found matching your filters.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <!-- Partial Payment Modal -->
+    <div class="modal fade" id="partialPaymentModal" tabindex="-1" aria-labelledby="partialPaymentModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="partialPaymentModalLabel">Update Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="partialPaymentForm" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <p>Update payment for client: <strong id="clientMarkDisplay"></strong></p>
+                            <p>Total price: <strong id="totalPriceDisplay"></strong></p>
+                        </div>
+                        <div class="mb-3">
+                            <label for="paid_amount" class="form-label">Paid Amount</label>
+                            <input type="number" class="form-control" id="paid_amount" name="paid_amount" 
+                                   min="0" step="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="remaining_amount" class="form-label">Remaining Amount</label>
+                            <input type="number" class="form-control" id="remaining_amount" readonly>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Payment</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mark As Paid Form (Hidden) -->
+    <form id="markAsPaidForm" method="POST" style="display:none;"></form>
+</div>
+
+<script>
+    function confirmMarkAsPaid(shipmentId, clientMark) {
+        if (confirm(`Are you sure you want to mark the payment for client ${clientMark} as fully paid?`)) {
+            const form = document.getElementById('markAsPaidForm');
+            form.action = `/shipment/${shipmentId}/mark-as-paid`;
+            form.submit();
+        }
+    }
+    
+    function setupPartialPayment(shipmentId, clientMark, totalPrice, paidAmount) {
+        // Set up the modal with shipment information
+        document.getElementById('clientMarkDisplay').textContent = clientMark;
+        document.getElementById('totalPriceDisplay').textContent = `AED ${totalPrice.toLocaleString()}`;
+        
+        const paidInput = document.getElementById('paid_amount');
+        const remainingInput = document.getElementById('remaining_amount');
+        
+        paidInput.value = paidAmount;
+        paidInput.max = totalPrice;
+        remainingInput.value = totalPrice - paidAmount;
+        
+        // Update remaining amount when paid amount changes
+        paidInput.addEventListener('input', function() {
+            const paid = parseFloat(this.value) || 0;
+            remainingInput.value = Math.max(0, totalPrice - paid).toFixed(2);
+        });
+        
+        // Set form action
+        const form = document.getElementById('partialPaymentForm');
+        form.action = `/shipment/${shipmentId}/update-partial-payment`;
+    }
+</script>
+{% endblock %}

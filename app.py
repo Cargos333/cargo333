@@ -955,6 +955,129 @@ def get_shipment_details(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/payments-tracker')
+@login_required
+def payments_tracker():
+    """Page to track clients with unpaid or partially paid shipments in delivered containers"""
+    
+    # Get filters from query parameters
+    container_filter = request.args.get('container', '')
+    payment_filter = request.args.get('payment_status', '')
+    search_query = request.args.get('search', '').strip()
+    
+    # Base query to get unpaid or partially paid shipments from DELIVERED containers only
+    query = db.session.query(
+        Shipment, Client, Container
+    ).join(
+        Client, Shipment.client_id == Client.id
+    ).join(
+        Container, Shipment.container_id == Container.id
+    ).filter(
+        Container.status == 'delivered',  # Only show delivered containers
+        Shipment.payment_status.in_(['unpaid', 'partial'])
+    )
+    
+    # Apply filters if provided
+    if container_filter:
+        query = query.filter(Container.id == container_filter)
+    
+    if payment_filter:
+        query = query.filter(Shipment.payment_status == payment_filter)
+        
+    if search_query:
+        query = query.filter(
+            db.or_(
+                Client.name.ilike(f'%{search_query}%'),
+                Client.mark.ilike(f'%{search_query}%'),
+                Client.phone.ilike(f'%{search_query}%'),
+                Container.container_number.ilike(f'%{search_query}%')
+            )
+        )
+    
+    # Get all results
+    results = query.order_by(Container.id, Client.name).all()
+    
+    # Get all containers for the filter dropdown - only delivered ones
+    containers = Container.query.filter_by(status='delivered').order_by(
+        Container.id.desc()
+    ).all()
+    
+    # Calculate statistics
+    total_unpaid = sum([(s.price + s.extra_charge - (s.paid_amount or 0)) for s, c, cont in results])
+    total_items = len(results)
+    unpaid_count = len([s for s, c, cont in results if s.payment_status == 'unpaid'])
+    partial_count = len([s for s, c, cont in results if s.payment_status == 'partial'])
+    
+    return render_template(
+        'payments_tracker.html',
+        results=results,
+        containers=containers,
+        container_filter=container_filter,
+        payment_filter=payment_filter,
+        search_query=search_query,
+        total_unpaid=total_unpaid,
+        total_items=total_items,
+        unpaid_count=unpaid_count,
+        partial_count=partial_count
+    )
+
+@app.route('/shipment/<int:id>/mark-as-paid', methods=['POST'])
+@login_required
+def mark_shipment_paid(id):
+    """Mark a shipment as paid from the payments tracker"""
+    try:
+        shipment = Shipment.query.get_or_404(id)
+        
+        # Set payment status to paid and update paid_amount
+        shipment.payment_status = 'paid'
+        shipment.paid_amount = shipment.price + shipment.extra_charge
+        
+        db.session.commit()
+        flash(f'Payment for client {shipment.client.mark} has been marked as paid', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating payment status: {str(e)}', 'danger')
+        
+    # Return to payments tracker with original filters
+    return redirect(request.referrer or url_for('payments_tracker'))
+
+@app.route('/shipment/<int:id>/update-partial-payment', methods=['POST'])
+@login_required
+def update_partial_payment(id):
+    """Update partial payment amount for a shipment"""
+    try:
+        shipment = Shipment.query.get_or_404(id)
+        
+        # Get the new paid amount from form
+        paid_amount = float(request.form.get('paid_amount', 0))
+        total_amount = shipment.price + shipment.extra_charge
+        
+        # Validate the amount (must be between 0 and total price)
+        if paid_amount < 0 or paid_amount > total_amount:
+            flash('Invalid payment amount', 'danger')
+            return redirect(request.referrer or url_for('payments_tracker'))
+        
+        # Update payment status based on amount
+        if paid_amount == 0:
+            shipment.payment_status = 'unpaid'
+        elif paid_amount >= total_amount:
+            shipment.payment_status = 'paid'
+            shipment.paid_amount = total_amount
+        else:
+            shipment.payment_status = 'partial'
+            shipment.paid_amount = paid_amount
+        
+        db.session.commit()
+        flash(f'Payment for client {shipment.client.mark} has been updated', 'success')
+    except ValueError:
+        flash('Please enter a valid payment amount', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating payment: {str(e)}', 'danger')
+        
+    # Return to payments tracker with original filters
+    return redirect(request.referrer or url_for('payments_tracker'))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

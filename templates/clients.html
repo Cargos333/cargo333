@@ -7,7 +7,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="GET" action="{{ url_for('clients') }}" class="d-flex gap-2">
-                <input type="text" name="search" class="form-control" placeholder="Search clients..." value="{{ search_query }}">
+                <input type="text" id="client-search-input" name="search" class="form-control" placeholder="Search clients..." value="{{ search_query }}">
                 <button type="submit" class="btn btn-primary">Search</button>
                 {% if search_query %}
                     <a href="{{ url_for('clients') }}" class="btn btn-secondary">Clear</a>
@@ -15,6 +15,64 @@
             </form>
         </div>
     </div>
+
+    <!-- Add jQuery UI CSS and JS for autocomplete -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+    
+    <script>
+    $(function() {
+        $("#client-search-input").autocomplete({
+            source: function(request, response) {
+                $.ajax({
+                    url: "{{ url_for('client_autocomplete') }}",
+                    dataType: "json",
+                    data: {
+                        term: request.term
+                    },
+                    success: function(data) {
+                        response(data);
+                    }
+                });
+            },
+            minLength: 2,
+            select: function(event, ui) {
+                $(this).val(ui.item.value);
+                $(this).closest("form").submit();
+            }
+        }).autocomplete("instance")._renderItem = function(ul, item) {
+            return $("<li>")
+                .append("<div class='autocomplete-item'>" + 
+                       "<span class='client-mark'>" + item.mark + "</span> - " + 
+                       "<span class='client-name'>" + item.name + "</span>" +
+                       (item.phone ? " (" + item.phone + ")" : "") +
+                       "</div>")
+                .appendTo(ul);
+        };
+    });
+    </script>
+
+    <style>
+    .ui-autocomplete {
+        max-height: 300px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        z-index: 9999 !important;
+    }
+    .autocomplete-item {
+        padding: 5px;
+        font-size: 0.9rem;
+    }
+    .client-mark {
+        font-weight: bold;
+    }
+    .ui-state-active, 
+    .ui-widget-content .ui-state-active {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    </style>
 
     {% if search_query %}
     <div class="card mb-4">

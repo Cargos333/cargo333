@@ -820,6 +820,44 @@ def search_clients():
     
     return jsonify(formatted_results)
 
+@app.route('/api/client-autocomplete')
+@login_required
+def client_autocomplete():
+    term = request.args.get('term', '').strip()
+    
+    if len(term) < 2:
+        return jsonify([])
+    
+    # Search for clients by mark, name, and phone
+    clients = db.session.query(
+        Client.mark, 
+        Client.name, 
+        Client.phone
+    ).filter(
+        db.or_(
+            Client.mark.ilike(f'%{term}%'),
+            Client.name.ilike(f'%{term}%'),
+            Client.phone.ilike(f'%{term}%')
+        )
+    ).distinct().limit(20).all()
+    
+    # Format results for autocomplete
+    results = []
+    for client in clients:
+        display_text = f"{client.mark} - {client.name}"
+        if client.phone:
+            display_text += f" ({client.phone})"
+            
+        results.append({
+            'value': client.mark,  # Value that goes into search box when selected
+            'label': display_text, # Text shown in dropdown
+            'mark': client.mark,
+            'name': client.name,
+            'phone': client.phone
+        })
+    
+    return jsonify(results)
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

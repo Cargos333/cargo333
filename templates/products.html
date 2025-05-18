@@ -137,7 +137,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="table-secondary">
-                            <td colspan="5"><strong>Total Volume</strong></td>
+                            <td colspan="5" class="print-colspan"><strong>Total Volume</strong></td>
                             <td><strong>{{ "%.2f"|format(products|sum(attribute='volume')) }} m³</strong></td>
                             <td></td>
                         </tr>
@@ -158,6 +158,13 @@
     th:last-child,
     td:last-child,
     .card-header {
+        display: none !important;
+    }
+    
+    /* Hide Length, Width, and Height columns */
+    th:nth-child(3), td:nth-child(3),    /* Length column */
+    th:nth-child(4), td:nth-child(4),    /* Width column */
+    th:nth-child(5), td:nth-child(5) {   /* Height column */
         display: none !important;
     }
     
@@ -185,6 +192,23 @@
     th, td {
         padding: 8px !important;
         border: 1px solid #ddd !important;
+    }
+    
+    /* Fix the footer colspan for print layout */
+    tfoot tr td:first-child {
+        colspan: 2 !important;
+    }
+    
+    /* Adjust table layout when columns are hidden */
+    table {
+        table-layout: auto !important;
+    }
+    
+    /* Ensure the total volume row spans correctly in print */
+    @media print {
+        tfoot tr td:first-child {
+            text-align: right !important;
+        }
     }
     
     @page {
@@ -222,7 +246,22 @@ function saveProduct(productId) {
 }
 
 function printProducts() {
+    // Adjust footer colspan for printing
+    const footerCell = document.querySelector('tfoot tr td:first-child');
+    const originalColspan = footerCell.getAttribute('colspan');
+    
+    // Store original value to restore after printing
+    footerCell.dataset.originalColspan = originalColspan;
+    
+    // Set to 2 for printing (accounting for the hidden columns)
+    footerCell.setAttribute('colspan', '2');
+    
     window.print();
+    
+    // Restore original colspan after printing
+    setTimeout(() => {
+        footerCell.setAttribute('colspan', footerCell.dataset.originalColspan);
+    }, 500);
 }
 </script>
 {% endblock %}

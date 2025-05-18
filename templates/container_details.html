@@ -62,6 +62,12 @@
             <hr>
             <!-- Existing manual form -->
             <form action="{{ url_for('add_client_to_container', id=container.id) }}" method="POST">
+                <div class="row mb-4">
+                    <!-- Add this div above or within your client add form -->
+                    <div class="col-12">
+                        <div id="outstanding-payments-alert"></div>
+                    </div>
+                </div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="client_mark" class="form-label">Client Mark</label>
@@ -102,7 +108,6 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Add Client</button>
             </form>
-            <div class="mb-3" id="outstanding-payments-alert"></div>
         </div>
     </div>
     {% endif %}
@@ -126,9 +131,15 @@
             </thead>
             <tbody>
                 {% for shipment in container.shipments %}
-                <tr data-shipment-id="{{ shipment.id }}">
+                <tr data-shipment-id="{{ shipment.id }}" data-client-mark="{{ shipment.client.mark }}">
                     <td>
-                        <span class="view-mode">{{ shipment.client.mark }}</span>
+                        <span class="view-mode">
+                            {{ shipment.client.mark }}
+                            <span class="outstanding-badge d-none" 
+                                  onclick="showResolveOutstandingModal('{{ shipment.client.mark }}', 0, {{ shipment.id }})">
+                                <i class="fas fa-exclamation-circle text-warning"></i>
+                            </span>
+                        </span>
                         <input type="text" class="form-control edit-mode d-none" name="client_mark" value="{{ shipment.client.mark }}">
                     </td>
                     <td>
@@ -583,14 +594,16 @@ Tel: 338 91 61</div>
     }, 250);
 }
 
-// Function to check for outstanding payments
-function checkOutstandingPayments(clientMark) {
+// Modify the existing lookupClient function
+function lookupClient() {
+    const clientMark = document.getElementById('client_mark').value.trim();
     if (!clientMark) return;
     
     // Clear previous alerts
     document.getElementById('outstanding-payments-alert').innerHTML = '';
     
-    fetch(`/api/client-outstanding-payments/${encodeURIComponent(clientMark)}`)
+    // Always perform a fresh check for outstanding payments, bypassing any caching
+    fetch(`/api/client-outstanding-payments/${encodeURIComponent(clientMark)}?timestamp=${Date.now()}`)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.has_outstanding) {
@@ -598,41 +611,45 @@ function checkOutstandingPayments(clientMark) {
                 const alertDiv = document.getElementById('outstanding-payments-alert');
                 
                 let alertHTML = `
-                    <div class="alert alert-warning">
+                    <div class="alert alert-warning alert-dismissible fade show">
                         <h5><i class="fas fa-exclamation-triangle"></i> Outstanding Payments Found</h5>
-                        <p>Client <strong>${data.client_name} (${data.client_mark})</strong> has unpaid amounts from delivered containers.</p>
+                        <p>Client <strong>${data.client_name} (${data.client_mark})</strong> has unpaid amounts from previous deliveries.</p>
                         <p>Total outstanding: <strong>AED ${data.total_outstanding.toLocaleString()}</strong></p>
                         <button type="button" class="btn btn-warning btn-sm" onclick="addAsExtraCharge(${data.total_outstanding})">
-                            Add as Extra Charge
+                            <i class="fas fa-plus-circle"></i> Add as Extra Charge
                         </button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" data-bs-toggle="collapse" data-bs-target="#outstandingDetails">
-                            Show Details
+                        <button type="button" class="btn btn-outline-dark btn-sm ms-2" data-bs-toggle="collapse" data-bs-target="#outstandingDetails">
+                            <i class="fas fa-info-circle"></i> Show Details
                         </button>
-                        <div class="collapse mt-2" id="outstandingDetails">
-                            <table class="table table-sm table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Container</th>
-                                        <th>Total</th>
-                                        <th>Paid</th>
-                                        <th>Outstanding</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-                                
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        
+                        <div class="collapse mt-3" id="outstandingDetails">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Container</th>
+                                            <th>Total Price</th>
+                                            <th>Paid</th>
+                                            <th>Outstanding</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                                    
                 data.shipments.forEach(shipment => {
                     alertHTML += `
                         <tr>
                             <td>${shipment.container_number}</td>
                             <td>AED ${shipment.total_price.toLocaleString()}</td>
                             <td>AED ${shipment.paid.toLocaleString()}</td>
-                            <td>AED ${shipment.outstanding.toLocaleString()}</td>
+                            <td class="text-danger">AED ${shipment.outstanding.toLocaleString()}</td>
                         </tr>`;
                 });
                 
                 alertHTML += `
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -641,21 +658,6 @@ function checkOutstandingPayments(clientMark) {
             }
         })
         .catch(error => console.error('Error checking outstanding payments:', error));
-}
-
-function addAsExtraCharge(amount) {
-    document.getElementById('extra_charge').value = amount;
-    // Also update price calculation
-    calculatePrice();
-}
-
-// Modify the existing client lookup function to check for outstanding payments
-function lookupClient() {
-    const clientMark = document.getElementById('client_mark').value.trim();
-    if (!clientMark) return;
-    
-    // First check for outstanding payments
-    checkOutstandingPayments(clientMark);
     
     // Continue with the existing client lookup functionality
     fetch(`/client/get_by_mark/${encodeURIComponent(clientMark)}`)
@@ -669,5 +671,311 @@ function lookupClient() {
         .catch(error => console.error('Error:', error));
 }
 
+// Add function to add outstanding amount as extra charge
+function addAsExtraCharge(amount) {
+    const extraChargeInput = document.getElementById('extra_charge');
+    
+    // If there's already a value, add to it
+    const currentValue = parseFloat(extraChargeInput.value) || 0;
+    const newValue = currentValue + amount;
+    
+    extraChargeInput.value = newValue.toFixed(2);
+    
+    // Highlight the field briefly to draw attention
+    extraChargeInput.classList.add('bg-warning');
+    setTimeout(() => {
+        extraChargeInput.classList.remove('bg-warning');
+    }, 2000);
+    
+    // Update price calculation if that function exists
+    if (typeof calculatePrice === 'function') {
+        calculatePrice();
+    }
+    
+    // Update the alert to indicate the amount has been added
+    const alert = document.querySelector('#outstanding-payments-alert .alert');
+    if (alert) {
+        const addButton = alert.querySelector('.btn-warning');
+        if (addButton) {
+            addButton.innerHTML = '<i class="fas fa-check-circle"></i> Added to Extra Charge';
+            addButton.classList.replace('btn-warning', 'btn-success');
+            addButton.disabled = true;
+        }
+    }
+}
+
+// Make sure we call lookupClient when the input loses focus
+document.getElementById('client_mark').addEventListener('blur', lookupClient);
+// Also trigger on 'Enter' key press
+document.getElementById('client_mark').addEventListener('keyup', function(event) {
+    if (event.key === 'Enter') {
+        lookupClient();
+    }
+});
+
+// Function to check outstanding payments for all clients in the table
+function checkOutstandingPaymentsForTable() {
+    // Get all client marks from the table
+    const clientRows = document.querySelectorAll('tr[data-client-mark]');
+    
+    // First, reset all outstanding badges
+    document.querySelectorAll('.outstanding-badge').forEach(badge => {
+        badge.classList.add('d-none');
+        badge.removeAttribute('data-outstanding');
+        badge.removeAttribute('title');
+        badge.classList.remove('clickable-badge');
+        
+        // Remove any existing event listeners
+        const newBadge = badge.cloneNode(true);
+        badge.parentNode.replaceChild(newBadge, badge);
+    });
+    
+    // Process in batches to avoid too many simultaneous requests
+    const processNextBatch = (startIndex, batchSize) => {
+        const endIndex = Math.min(startIndex + batchSize, clientRows.length);
+        const promises = [];
+        
+        for (let i = startIndex; i < endIndex; i++) {
+            const row = clientRows[i];
+            const clientMark = row.getAttribute('data-client-mark');
+            const shipmentId = row.getAttribute('data-shipment-id');
+            
+            if (clientMark) {
+                // Add a timestamp to prevent caching
+                const promise = fetch(`/api/client-outstanding-payments/${encodeURIComponent(clientMark)}?timestamp=${Date.now()}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.has_outstanding) {
+                            // Show the outstanding badge
+                            const badge = row.querySelector('.outstanding-badge');
+                            if (badge) {
+                                badge.classList.remove('d-none');
+                                // Store the outstanding amount as a data attribute
+                                badge.setAttribute('data-outstanding', data.total_outstanding);
+                                // Change styling to make it obvious it's clickable
+                                badge.classList.add('clickable-badge');
+                                
+                                // Set the badge to show the amount on hover using a normal title
+                                badge.setAttribute('title', `Outstanding: AED ${data.total_outstanding.toLocaleString()} - Click to resolve`);
+                                
+                                // Set onclick handler with the correct parameters
+                                badge.onclick = function(event) {
+                                    // Prevent event propagation to avoid any parent click handlers
+                                    event.stopPropagation();
+                                    showResolveOutstandingModal(clientMark, data.total_outstanding, shipmentId);
+                                };
+                            }
+                        }
+                    })
+                    .catch(error => console.error(`Error checking payments for ${clientMark}:`, error));
+                
+                promises.push(promise);
+            }
+        }
+        
+        // When all requests in this batch are done, process the next batch
+        Promise.all(promises).then(() => {
+            if (endIndex < clientRows.length) {
+                // Process next batch after a short delay to avoid overwhelming the server
+                setTimeout(() => processNextBatch(endIndex, batchSize), 200);
+            }
+        });
+    };
+    
+    // Start processing in batches of 5
+    processNextBatch(0, 5);
+}
+
+// Function to show modal for resolving outstanding payments
+function showResolveOutstandingModal(clientMark, outstandingAmount, shipmentId) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('resolveOutstandingModal');
+    if (!modal) {
+        const modalHTML = `
+            <div class="modal fade" id="resolveOutstandingModal" tabindex="-1" aria-labelledby="resolveOutstandingModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="resolveOutstandingModalLabel">Resolve Outstanding Payment</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Client <strong id="resolveClientMark"></strong> has outstanding payments of 
+                               <strong id="resolveOutstandingAmount"></strong>.</p>
+                            <p>How would you like to handle this?</p>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="resolveOption" id="addAsExtraCharge" value="extra_charge" checked>
+                                <label class="form-check-label" for="addAsExtraCharge">
+                                    Add as extra charge to current shipment
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="resolveOption" id="keepSeparate" value="keep_separate">
+                                <label class="form-check-label" for="keepSeparate">
+                                    Keep as separate outstanding payment
+                                </label>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="resolveConfirmBtn">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        modal = document.getElementById('resolveOutstandingModal');
+    }
+    
+    // If outstandingAmount is 0, fetch it from the API
+    if (outstandingAmount === 0) {
+        fetch(`/api/client-outstanding-payments/${encodeURIComponent(clientMark)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.has_outstanding) {
+                    setupModalContent(clientMark, data.total_outstanding, shipmentId);
+                    const modalInstance = new bootstrap.Modal(modal);
+                    modalInstance.show();
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching outstanding amount:', error);
+                alert('Could not fetch outstanding payment details');
+            });
+    } else {
+        setupModalContent(clientMark, outstandingAmount, shipmentId);
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+    }
+}
+
+// Helper function to set up modal content
+function setupModalContent(clientMark, outstandingAmount, shipmentId) {
+    document.getElementById('resolveClientMark').textContent = clientMark;
+    document.getElementById('resolveOutstandingAmount').textContent = `AED ${outstandingAmount.toLocaleString()}`;
+    
+    // Handle confirm button click
+    document.getElementById('resolveConfirmBtn').onclick = function() {
+        const option = document.querySelector('input[name="resolveOption"]:checked').value;
+        
+        if (option === 'extra_charge') {
+            // Add to extra charge and mark as resolved in the system
+            addOutstandingToExtraCharge(shipmentId, outstandingAmount, clientMark);
+        } else {
+            // Just close the modal - keep payments separate
+            const modal = document.getElementById('resolveOutstandingModal');
+            const modalInstance = bootstrap.Modal.getInstance(modal);
+            modalInstance.hide();
+        }
+    };
+}
+
+// Add function to add outstanding amount to extra charge
+function addOutstandingToExtraCharge(shipmentId, amount, clientMark) {
+    const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
+    if (!row) return;
+    
+    const extraChargeSpan = row.querySelector('td:nth-child(6) .view-mode');
+    const extraChargeInput = row.querySelector('input[name="extra_charge"]');
+    
+    if (extraChargeSpan && extraChargeInput) {
+        // Get current extra charge
+        const currentExtraCharge = parseFloat(extraChargeSpan.textContent.replace('AED', '').replace(',', '').trim()) || 0;
+        const newExtraCharge = currentExtraCharge + amount;
+        
+        // Update the extra charge input
+        extraChargeInput.value = newExtraCharge;
+        
+        // Call server to update the shipment and resolve outstanding payments
+        const formData = new FormData();
+        formData.append('shipment_id', shipmentId);
+        formData.append('extra_charge', newExtraCharge);
+        formData.append('client_mark', clientMark);
+        formData.append('resolve_outstanding', 'true');
+        
+        fetch('/api/resolve-outstanding-payments', {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if (response.ok) {
+                // Reload only the outstanding badges instead of the whole page
+                reloadAfterResolving();
+                
+                // Show success message
+                const alertHTML = `
+                    <div class="alert alert-success alert-dismissible fade show">
+                        <i class="fas fa-check-circle"></i> Added AED ${amount.toLocaleString()} to extra charge. Previous unpaid amounts marked as paid.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                const alertContainer = document.createElement('div');
+                alertContainer.innerHTML = alertHTML;
+                document.querySelector('.container').prepend(alertContainer.firstChild);
+                
+                // Hide the success message after 5 seconds
+                setTimeout(() => {
+                    const successAlert = document.querySelector('.alert-success');
+                    if (successAlert) {
+                        const bsAlert = new bootstrap.Alert(successAlert);
+                        bsAlert.close();
+                    }
+                }, 5000);
+                
+            } else {
+                alert('Error updating extra charge');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while processing your request');
+        });
+        
+        // Close modal
+        const modal = document.getElementById('resolveOutstandingModal');
+        const modalInstance = bootstrap.Modal.getInstance(modal);
+        modalInstance.hide();
+    }
+}
+
+// Add CSS for the outstanding badge
+document.head.insertAdjacentHTML('beforeend', `
+    <style>
+        .outstanding-badge {
+            margin-left: 5px;
+        }
+        .outstanding-badge i {
+            font-size: 0.9rem;
+        }
+        .clickable-badge {
+            cursor: pointer;
+        }
+        .clickable-badge:hover {
+            opacity: 0.8;
+            transform: scale(1.2);
+        }
+        .tooltip-inner {
+            max-width: 300px;
+            text-align: left;
+        }
+    </style>
+`);
+
+// When the page is fully loaded, check for outstanding payments
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize all tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Check for outstanding payments
+    checkOutstandingPaymentsForTable();
+});
+
+// Add a reload function that's called after resolving payments
+function reloadAfterResolving() {
+    // Refresh only the outstanding badges without reloading the page
+    checkOutstandingPaymentsForTable();
+}
 </script>
 {% endblock %}

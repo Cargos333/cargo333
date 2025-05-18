@@ -56,7 +56,8 @@ def add_container():
 @app.route('/history')
 @login_required
 def history():
-    delivered_containers = Container.query.filter_by(status='delivered').all()
+    # Change ordering to descending by ID
+    delivered_containers = Container.query.filter_by(status='delivered').order_by(Container.id.desc()).all()
     return render_template('history.html', containers=delivered_containers)
 
 @app.route('/')
@@ -151,6 +152,24 @@ def add_client_to_container(id):
         name = request.form.get('client_name', '').strip()
         mark = request.form.get('client_mark', '').strip()
         phone = request.form.get('client_phone', '').strip()
+        
+        # Check for outstanding payments before adding client
+        clients_with_same_mark = Client.query.filter(Client.mark.ilike(mark)).all()
+        
+        if clients_with_same_mark:
+            client_ids = [c.id for c in clients_with_same_mark]
+            # Check for outstanding payments
+            outstanding_payments = db.session.query(Shipment).join(
+                Container, Shipment.container_id == Container.id
+            ).filter(
+                Shipment.client_id.in_(client_ids),
+                Container.status == 'delivered',
+                Shipment.payment_status.in_(['unpaid', 'partial'])
+            ).all()
+            
+            # Log if we found outstanding payments
+            if outstanding_payments:
+                app.logger.info(f"Client mark {mark} has {len(outstanding_payments)} outstanding payments but proceeding with adding to container")
         
         # Validate numeric inputs
         volume = request.form.get('volume', '')
@@ -346,8 +365,8 @@ def clients():
     active_containers = {}
     history_containers = {}
     
-    # Get containers and separate them by status
-    containers = Container.query.all()
+    # Get containers in descending order by ID
+    containers = Container.query.order_by(Container.id.desc()).all()
     for container in containers:
         if search_query:
             container_clients = Client.query.join(Client.shipments)\
@@ -994,8 +1013,8 @@ def payments_tracker():
             )
         )
     
-    # Get all results
-    results = query.order_by(Container.id, Client.name).all()
+    # Get all results - change ordering to descending by container ID
+    results = query.order_by(Container.id.desc(), Client.name).all()
     
     # Get all containers for the filter dropdown - only delivered ones
     containers = Container.query.filter_by(status='delivered').order_by(
@@ -1077,6 +1096,117 @@ def update_partial_payment(id):
         
     # Return to payments tracker with original filters
     return redirect(request.referrer or url_for('payments_tracker'))
+
+@app.route('/api/client-outstanding-payments/<mark>')
+@login_required
+def client_outstanding_payments(mark):
+    """API endpoint to check if a client has outstanding payments from delivered containers"""
+    try:
+        # Always do a case-insensitive search to find all possible matches
+        clients = Client.query.filter(Client.mark.ilike(mark.strip())).all()
+        
+        if not clients:
+            return jsonify({"success": False, "message": "Client not found"}), 404
+        
+        # Get ALL client IDs that match this mark (case insensitive)
+        client_ids = [c.id for c in clients]
+        primary_client = clients[0]  # Use the first matching client for name display
+        
+        # Log what we're searching for
+        app.logger.info(f"Searching for outstanding payments for mark '{mark}', found clients: {client_ids}")
+        
+        # Find all shipments with unpaid balances for these client IDs
+        outstanding_shipments = db.session.query(
+            Shipment, Container
+        ).join(
+            Container, Shipment.container_id == Container.id
+        ).filter(
+            Shipment.client_id.in_(client_ids),
+            Container.status == 'delivered',
+            Shipment.payment_status.in_(['unpaid', 'partial'])
+        ).all()
+        
+        # Debug info for the response
+        total_outstanding = 0
+        shipments_data = []
+        
+        for shipment, container in outstanding_shipments:
+            # Calculate outstanding amount for this shipment
+            total_price = shipment.price + shipment.extra_charge
+            paid = shipment.paid_amount or 0
+            outstanding = total_price - paid
+            
+            # Only include if there's an actual outstanding amount
+            if outstanding > 0:
+                total_outstanding += outstanding
+                
+                shipments_data.append({
+                    'container_number': container.container_number,
+                    'outstanding': outstanding,
+                    'total_price': total_price,
+                    'paid': paid,
+                    'shipment_id': shipment.id,
+                    'client_id': shipment.client_id,
+                    'payment_status': shipment.payment_status
+                })
+        
+        # Log what we found
+        app.logger.info(f"Found {len(shipments_data)} outstanding payments totaling AED {total_outstanding}")
+        
+        return jsonify({
+            'success': True,
+            'client_name': primary_client.name,
+            'client_mark': primary_client.mark,
+            'total_outstanding': total_outstanding,
+            'shipments': shipments_data,
+            'has_outstanding': len(shipments_data) > 0
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error checking outstanding payments: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/resolve-outstanding-payments', methods=['POST'])
+@login_required
+def resolve_outstanding_payments():
+    """API endpoint to resolve outstanding payments by adding them as extra charge"""
+    try:
+        # ...existing code...
+        
+        # Mark outstanding payments as resolved if requested
+        if resolve_outstanding:
+            # Get only the SPECIFIC shipments with outstanding balances, not all
+            # shipments for the client
+            client = Client.query.filter_by(mark=client_mark).first()
+            if client:
+                # Only mark specifically identified outstanding shipments as paid
+                outstanding_shipments_query = db.session.query(Shipment).join(
+                    Container, Shipment.container_id == Container.id
+                ).filter(
+                    Shipment.client_id == client.id,
+                    Container.status == 'delivered',
+                    Shipment.payment_status.in_(['unpaid', 'partial'])
+                )
+                
+                # Get the actual shipments before updating
+                outstanding_shipments = outstanding_shipments_query.all()
+                
+                # Process each shipment individually to ensure proper tracking
+                for os in outstanding_shipments:
+                    # Calculate total amount
+                    total = os.price + os.extra_charge
+                    # Only mark as paid if there's actually an unpaid amount
+                    if os.payment_status == 'unpaid' or (os.payment_status == 'partial' and os.paid_amount < total):
+                        os.payment_status = 'paid'
+                        os.paid_amount = total
+                
+                # ...existing code...
+        
+        # ...existing code...
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():

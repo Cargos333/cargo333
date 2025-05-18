@@ -102,6 +102,7 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Add Client</button>
             </form>
+            <div class="mb-3" id="outstanding-payments-alert"></div>
         </div>
     </div>
     {% endif %}
@@ -581,5 +582,92 @@ Tel: 338 91 61</div>
         printWindow.close();
     }, 250);
 }
+
+// Function to check for outstanding payments
+function checkOutstandingPayments(clientMark) {
+    if (!clientMark) return;
+    
+    // Clear previous alerts
+    document.getElementById('outstanding-payments-alert').innerHTML = '';
+    
+    fetch(`/api/client-outstanding-payments/${encodeURIComponent(clientMark)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.has_outstanding) {
+                // Create alert message for outstanding payments
+                const alertDiv = document.getElementById('outstanding-payments-alert');
+                
+                let alertHTML = `
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Outstanding Payments Found</h5>
+                        <p>Client <strong>${data.client_name} (${data.client_mark})</strong> has unpaid amounts from delivered containers.</p>
+                        <p>Total outstanding: <strong>AED ${data.total_outstanding.toLocaleString()}</strong></p>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="addAsExtraCharge(${data.total_outstanding})">
+                            Add as Extra Charge
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" data-bs-toggle="collapse" data-bs-target="#outstandingDetails">
+                            Show Details
+                        </button>
+                        <div class="collapse mt-2" id="outstandingDetails">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Container</th>
+                                        <th>Total</th>
+                                        <th>Paid</th>
+                                        <th>Outstanding</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                                
+                data.shipments.forEach(shipment => {
+                    alertHTML += `
+                        <tr>
+                            <td>${shipment.container_number}</td>
+                            <td>AED ${shipment.total_price.toLocaleString()}</td>
+                            <td>AED ${shipment.paid.toLocaleString()}</td>
+                            <td>AED ${shipment.outstanding.toLocaleString()}</td>
+                        </tr>`;
+                });
+                
+                alertHTML += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                
+                alertDiv.innerHTML = alertHTML;
+            }
+        })
+        .catch(error => console.error('Error checking outstanding payments:', error));
+}
+
+function addAsExtraCharge(amount) {
+    document.getElementById('extra_charge').value = amount;
+    // Also update price calculation
+    calculatePrice();
+}
+
+// Modify the existing client lookup function to check for outstanding payments
+function lookupClient() {
+    const clientMark = document.getElementById('client_mark').value.trim();
+    if (!clientMark) return;
+    
+    // First check for outstanding payments
+    checkOutstandingPayments(clientMark);
+    
+    // Continue with the existing client lookup functionality
+    fetch(`/client/get_by_mark/${encodeURIComponent(clientMark)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.error) {
+                document.getElementById('client_name').value = data.name;
+                document.getElementById('client_phone').value = data.phone || '';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
 </script>
 {% endblock %}

@@ -1078,58 +1078,6 @@ def update_partial_payment(id):
     # Return to payments tracker with original filters
     return redirect(request.referrer or url_for('payments_tracker'))
 
-@app.route('/api/client-outstanding-payments/<mark>')
-@login_required
-def client_outstanding_payments(mark):
-    """API endpoint to get outstanding payments for a client by mark"""
-    try:
-        # Find client by mark
-        client = Client.query.filter_by(mark=mark).first()
-        
-        if not client:
-            return jsonify({"success": False, "message": "Client not found"}), 404
-            
-        # Find all shipments in DELIVERED containers that are unpaid or partially paid
-        outstanding_shipments = db.session.query(
-            Shipment, Container
-        ).join(
-            Container, Shipment.container_id == Container.id
-        ).filter(
-            Shipment.client_id == client.id,
-            Container.status == 'delivered',
-            Shipment.payment_status.in_(['unpaid', 'partial'])
-        ).all()
-        
-        total_outstanding = 0
-        shipments_data = []
-        
-        for shipment, container in outstanding_shipments:
-            # Calculate outstanding amount for this shipment
-            total_price = shipment.price + shipment.extra_charge
-            paid = shipment.paid_amount or 0
-            outstanding = total_price - paid
-            total_outstanding += outstanding
-            
-            shipments_data.append({
-                'container_number': container.container_number,
-                'outstanding': outstanding,
-                'total_price': total_price,
-                'paid': paid,
-                'shipment_id': shipment.id
-            })
-        
-        return jsonify({
-            'success': True,
-            'client_name': client.name,
-            'client_mark': client.mark,
-            'total_outstanding': total_outstanding,
-            'shipments': shipments_data,
-            'has_outstanding': len(shipments_data) > 0
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

@@ -184,6 +184,12 @@
                                 <i class="fas fa-print"></i>
                             </button>
                             {% endif %}
+                            {% if shipment.client.phone %}
+                            <a href="https://wa.me/{{ shipment.client.phone|replace(' ', '')|replace('+', '') }}" 
+                               target="_blank" class="btn btn-sm" style="background-color: #25D366; color: white;">
+                                <i class="fab fa-whatsapp"></i>
+                            </a>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </td>

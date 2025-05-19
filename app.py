@@ -507,10 +507,14 @@ def client_products(id):
     latest_shipment = Shipment.query.filter_by(client_id=id).order_by(Shipment.id.desc()).first()
     container_delivered = latest_shipment.container.status == 'delivered' if latest_shipment else False
     
+    # Get the container information to show in print view
+    container = latest_shipment.container if latest_shipment else None
+    
     return render_template('products.html', 
                          client=client, 
                          products=products,
-                         container_delivered=container_delivered)
+                         container_delivered=container_delivered,
+                         container=container)  # Pass container to the template
 
 @app.route('/client/<int:id>/add_product', methods=['POST'])
 @login_required

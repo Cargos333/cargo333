@@ -14,6 +14,9 @@
             <p><strong>Client Name:</strong> {{ client.name }}</p>
             <p><strong>Mark:</strong> {{ client.mark }}</p>
             <p><strong>Phone:</strong> {{ client.phone }}</p>
+            {% if container %}
+            <p><strong>Container:</strong> <span class="container-number">#{{ container.container_number }}</span></p>
+            {% endif %}
         </div>
         <hr>
     </div>
@@ -244,6 +247,12 @@
     @page {
         size: portrait;
         margin: 1.5cm;
+    }
+    
+    /* Make container number large and bold */
+    .container-number {
+        font-size: 20px;
+        font-weight: bold;
     }
 }
 </style>

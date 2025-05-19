@@ -674,6 +674,7 @@ function lookupClient() {
 // Add function to add outstanding amount as extra charge
 function addAsExtraCharge(amount) {
     const extraChargeInput = document.getElementById('extra_charge');
+    const clientMarkInput = document.getElementById('client_mark');
     
     // If there's already a value, add to it
     const currentValue = parseFloat(extraChargeInput.value) || 0;
@@ -701,6 +702,62 @@ function addAsExtraCharge(amount) {
             addButton.classList.replace('btn-warning', 'btn-success');
             addButton.disabled = true;
         }
+    }
+    
+    // Call API to mark outstanding payments as resolved
+    const clientMark = clientMarkInput.value;
+    if (clientMark) {
+        const formData = new FormData();
+        formData.append('client_mark', clientMark);
+        formData.append('extra_charge', newValue);
+        formData.append('resolve_outstanding', 'true');
+        formData.append('new_client', 'true');  // Flag to indicate we're adding a new client
+        
+        // Add a loading indicator
+        const loadingIndicator = document.createElement('span');
+        loadingIndicator.innerHTML = ' <i class="fas fa-spinner fa-spin"></i> Resolving payments...';
+        loadingIndicator.id = 'payment-loading-indicator';
+        if (addButton) {
+            addButton.after(loadingIndicator);
+        }
+        
+        fetch('/api/resolve-outstanding-payments', {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Unknown error occurred');
+                });
+            }
+            return response.json();
+        }).then(data => {
+            console.log('Outstanding payments marked as resolved:', data);
+            
+            // Remove loading indicator
+            document.getElementById('payment-loading-indicator')?.remove();
+            
+            // Add success message
+            if (data.shipments_updated > 0) {
+                const successMsg = document.createElement('span');
+                successMsg.innerHTML = ` <i class="fas fa-check"></i> ${data.shipments_updated} shipments marked as paid`;
+                successMsg.className = 'text-success';
+                if (addButton) {
+                    addButton.after(successMsg);
+                }
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+            document.getElementById('payment-loading-indicator')?.remove();
+            
+            // Show error message
+            const errorMsg = document.createElement('span');
+            errorMsg.innerHTML = ` <i class="fas fa-exclamation-triangle"></i> ${error.message}`;
+            errorMsg.className = 'text-danger';
+            if (addButton) {
+                addButton.after(errorMsg);
+            }
+        });
     }
 }
 
@@ -898,7 +955,14 @@ function addOutstandingToExtraCharge(shipmentId, amount, clientMark) {
             method: 'POST',
             body: formData
         }).then(response => {
-            if (response.ok) {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Unknown error occurred');
+                });
+            }
+            return response.json();
+        }).then(data => {
+            if (data.success) {
                 // Reload only the outstanding badges instead of the whole page
                 reloadAfterResolving();
                 
@@ -927,7 +991,7 @@ function addOutstandingToExtraCharge(shipmentId, amount, clientMark) {
             }
         }).catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while processing your request');
+            alert(`Error updating extra charge: ${error.message}`);
         });
         
         // Close modal

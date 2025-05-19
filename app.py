@@ -1175,40 +1175,61 @@ def client_outstanding_payments(mark):
 def resolve_outstanding_payments():
     """API endpoint to resolve outstanding payments by adding them as extra charge"""
     try:
-        # ...existing code...
+        shipment_id = request.form.get('shipment_id')
+        extra_charge = float(request.form.get('extra_charge', 0))
+        client_mark = request.form.get('client_mark')
+        resolve_outstanding = request.form.get('resolve_outstanding') == 'true'
+        
+        # For the case where we're adding a new client (no shipment_id yet)
+        new_client = request.form.get('new_client') == 'true'
+        
+        if (not shipment_id and not new_client) or not client_mark:
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+            
+        # If shipment_id exists, update that shipment's extra charge
+        if shipment_id and not new_client:
+            # Get the current shipment
+            shipment = Shipment.query.get_or_404(shipment_id)
+            
+            # Update the extra charge
+            shipment.extra_charge = extra_charge
         
         # Mark outstanding payments as resolved if requested
         if resolve_outstanding:
-            # Get only the SPECIFIC shipments with outstanding balances, not all
-            # shipments for the client
-            client = Client.query.filter_by(mark=client_mark).first()
-            if client:
-                # Only mark specifically identified outstanding shipments as paid
-                outstanding_shipments_query = db.session.query(Shipment).join(
+            # Get client by mark - make sure to find ALL matching clients 
+            clients = Client.query.filter(Client.mark.ilike(client_mark.strip())).all()
+            
+            total_shipments_updated = 0
+            
+            for client in clients:
+                # Find all outstanding shipments for this client in DELIVERED containers
+                outstanding_shipments = db.session.query(Shipment).join(
                     Container, Shipment.container_id == Container.id
                 ).filter(
                     Shipment.client_id == client.id,
                     Container.status == 'delivered',
                     Shipment.payment_status.in_(['unpaid', 'partial'])
-                )
+                ).all()
                 
-                # Get the actual shipments before updating
-                outstanding_shipments = outstanding_shipments_query.all()
-                
-                # Process each shipment individually to ensure proper tracking
+                # Mark all as paid
                 for os in outstanding_shipments:
-                    # Calculate total amount
-                    total = os.price + os.extra_charge
-                    # Only mark as paid if there's actually an unpaid amount
-                    if os.payment_status == 'unpaid' or (os.payment_status == 'partial' and os.paid_amount < total):
-                        os.payment_status = 'paid'
-                        os.paid_amount = total
+                    total_amount = os.price + os.extra_charge
+                    os.payment_status = 'paid'
+                    os.paid_amount = total_amount
+                    total_shipments_updated += 1
                 
-                # ...existing code...
-        
-        # ...existing code...
+                app.logger.info(f"Marked {len(outstanding_shipments)} shipments as paid for client {client.mark} (ID: {client.id})")
+            
+            # Explicitly commit changes to ensure they're saved to database
+            db.session.commit()
+            app.logger.info(f"Total of {total_shipments_updated} shipments marked as paid across all clients with mark '{client_mark}'")
+                
+        # Final commit to ensure all changes are saved
+        db.session.commit()
+        return jsonify({'success': True, 'shipments_updated': total_shipments_updated if resolve_outstanding else 0})
         
     except Exception as e:
+        app.logger.error(f"Error in resolve_outstanding_payments: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 

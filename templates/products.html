@@ -170,15 +170,28 @@
 
 <style>
 @media print {
+    /* Hide navigation and UI elements */
     .navbar, 
+    .nav, 
+    nav,
     .no-print,
     button,
     form,
     .edit-mode,
     th:last-child,
     td:last-child,
-    .card-header {
+    .card-header,
+    #navbar,
+    header,
+    .sidebar,
+    footer {
         display: none !important;
+    }
+    
+    /* Make sure body starts at the top of the page */
+    body {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
     
     /* Hide Length, Width, and Height columns */
@@ -188,32 +201,29 @@
         display: none !important;
     }
     
+    /* Other headings */
     h1, h2 {
         display: none !important;
     }
     
+    /* Show print header */
     .print-header {
         display: block !important;
         margin-bottom: 20px;
     }
     
+    /* Container styling */
     .container {
         width: 100% !important;
         max-width: none !important;
         padding: 20px !important;
     }
     
-    table {
-        width: 100% !important;
-        font-size: 12px !important;
-        border-collapse: collapse !important;
+    /* Reset any fixed positioning that might affect printing */
+    .fixed-top, .sticky-top {
+        position: relative !important;
     }
-    
-    th, td {
-        padding: 8px !important;
-        border: 1px solid #ddd !important;
-    }
-    
+
     /* Fix the footer colspan for print layout */
     tfoot tr td:first-child {
         colspan: 2 !important;

@@ -173,28 +173,35 @@
 
 <style>
 @media print {
-    /* Hide navigation and UI elements */
-    .navbar, 
-    .nav, 
+    /* Hide navigation elements */
+    .navbar,
     nav,
+    header,
+    .nav,
+    .breadcrumb,
+    .navigation,
+    #navbar,
+    #header-nav,
+    .site-header,
+    .main-navigation,
+    .top-nav,
+    .header-menu,
+    .sidebar,
     .no-print,
     button,
     form,
     .edit-mode,
     th:last-child,
     td:last-child,
-    .card-header,
-    #navbar,
-    header,
-    .sidebar,
-    footer {
+    .card-header {
         display: none !important;
     }
     
-    /* Make sure body starts at the top of the page */
+    /* Reset body padding/margins to start content from top of page */
     body {
         margin-top: 0 !important;
         padding-top: 0 !important;
+        width: 100% !important;
     }
     
     /* Hide Length, Width, and Height columns */
@@ -204,29 +211,26 @@
         display: none !important;
     }
     
-    /* Other headings */
+    /* Override any fixed positioning that might affect printing */
+    .fixed-top, .sticky-top, .fixed-bottom {
+        position: static !important;
+    }
+    
     h1, h2 {
         display: none !important;
     }
     
-    /* Show print header */
     .print-header {
         display: block !important;
         margin-bottom: 20px;
     }
     
-    /* Container styling */
     .container {
         width: 100% !important;
         max-width: none !important;
         padding: 20px !important;
     }
     
-    /* Reset any fixed positioning that might affect printing */
-    .fixed-top, .sticky-top {
-        position: relative !important;
-    }
-
     /* Fix the footer colspan for print layout */
     tfoot tr td:first-child {
         colspan: 2 !important;

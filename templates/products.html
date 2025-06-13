@@ -2,7 +2,14 @@
 {% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4 no-print">
-        <h1>Products for {{ client.name }}</h1>
+        <div>
+            <h1>Products for {{ client.name }}</h1>
+            {% if from_container %}
+            <a href="{{ url_for('container_details', id=container_id) }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Container #{{ container.container_number }}
+            </a>
+            {% endif %}
+        </div>
         <button onclick="printProducts()" class="btn btn-success">
             <i class="fas fa-print"></i> Print Products
         </button>
@@ -103,11 +110,11 @@
                             </th>
                             {% endif %}
                             <th>Reference</th>
-                            <th>Quantity</th>
+                            <th>Quantity</th>  <!-- This is the second column we want to show in print -->
                             <th>Length (m)</th>
                             <th>Width (m)</th>
                             <th>Height (m)</th>
-                            <th>Volume (m³)</th>
+                            <th>Volume (m³)</th>  <!-- This is the sixth column we want to show in print -->
                             {% if not container_delivered %}
                             <th>Actions</th>
                             {% endif %}
@@ -204,12 +211,70 @@
         width: 100% !important;
     }
     
-    /* Hide Length, Width, and Height columns */
-    th:nth-child(3), td:nth-child(3),    /* Length column */
-    th:nth-child(4), td:nth-child(4),    /* Width column */
-    th:nth-child(5), td:nth-child(5) {   /* Height column */
+    /* First, hide ALL columns by default */
+    table th, table td {
         display: none !important;
     }
+    
+    /* Then explicitly show ONLY the three columns we want */
+    /* Reference column (first visible) */
+    table tbody tr td:nth-of-type({% if not container_delivered %}2{% else %}1{% endif %}),
+    table thead tr th:nth-of-type({% if not container_delivered %}2{% else %}1{% endif %}) {
+        display: table-cell !important;
+        width: 45% !important;
+    }
+    
+    /* Quantity column (second visible) */
+    table tbody tr td:nth-of-type({% if not container_delivered %}3{% else %}2{% endif %}),
+    table thead tr th:nth-of-type({% if not container_delivered %}3{% else %}2{% endif %}) {
+        display: table-cell !important;
+        width: 20% !important;
+    }
+    
+    /* Volume column (third visible) */
+    table tbody tr td:nth-of-type({% if not container_delivered %}7{% else %}6{% endif %}),
+    table thead tr th:nth-of-type({% if not container_delivered %}7{% else %}6{% endif %}) {
+        display: table-cell !important;
+        width: 35% !important;
+    }
+    
+    /* Hide checkbox column with !important */
+    table tr th:first-child, 
+    table tr td:first-child {
+        display: none !important;
+        width: 0 !important;
+        max-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+    
+    /* Hide length, width, height columns */
+    table tr th:nth-child(4), table tr td:nth-child(4),
+    table tr th:nth-child(5), table tr td:nth-child(5),
+    table tr th:nth-child(6), table tr td:nth-child(6) {
+        display: none !important;
+    }
+    
+    /* Fix for the footer row to span only visible columns */
+    tfoot tr td:first-of-type {
+        display: table-cell !important;
+        text-align: right !important;
+        width: 65% !important;
+        colspan: 2 !important;
+    }
+    
+    /* Make sure only Reference, Quantity and Volume columns remain visible */
+    th:nth-child(1), td:nth-child(1),    /* Reference column */
+    th:nth-child(2), td:nth-child(2),    /* Quantity column */ 
+    th:nth-child(6), td:nth-child(6) {   /* Volume column */
+        display: table-cell !important;
+    }
+    
+    /* Properly adjust the column widths for print */
+    th:nth-child(1), td:nth-child(1) { width: 45% !important; }  /* Reference */
+    th:nth-child(2), td:nth-child(2) { width: 20% !important; }  /* Quantity */
+    th:nth-child(6), td:nth-child(6) { width: 35% !important; }  /* Volume */
     
     /* Override any fixed positioning that might affect printing */
     .fixed-top, .sticky-top, .fixed-bottom {
@@ -218,6 +283,12 @@
     
     h1, h2 {
         display: none !important;
+    }
+    
+    /* Make container number large and bold */
+    .container-number {
+        font-size: 20px;
+        font-weight: bold;
     }
     
     .print-header {
@@ -251,12 +322,6 @@
     @page {
         size: portrait;
         margin: 1.5cm;
-    }
-    
-    /* Make container number large and bold */
-    .container-number {
-        font-size: 20px;
-        font-weight: bold;
     }
 }
 </style>
@@ -376,7 +441,6 @@ function deleteSelected() {
         // Submit the form
         document.body.appendChild(form);
         form.submit();
-        document.body.removeChild(form);
     }
 }
 </script>

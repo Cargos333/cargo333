@@ -502,19 +502,36 @@ def delete_employee(id):
 @login_required
 def client_products(id):
     client = Client.query.get_or_404(id)
-    products = Product.query.filter_by(client_id=id).all()
+    
+    # Get container ID from query parameter if provided
+    container_id = request.args.get('container_id', type=int)
+    
     # Get container status for this client's latest shipment
     latest_shipment = Shipment.query.filter_by(client_id=id).order_by(Shipment.id.desc()).first()
     container_delivered = latest_shipment.container.status == 'delivered' if latest_shipment else False
     
     # Get the container information to show in print view
-    container = latest_shipment.container if latest_shipment else None
+    # If container_id is provided, use that container, otherwise use the latest shipment's container
+    if container_id:
+        container = Container.query.get_or_404(container_id)
+        # Make sure the client has a shipment in this container
+        shipment = Shipment.query.filter_by(client_id=id, container_id=container_id).first_or_404()
+    else:
+        container = latest_shipment.container if latest_shipment else None
+    
+    # Get products - all products belong to the client regardless of container
+    products = Product.query.filter_by(client_id=id).all()
+    
+    # Check if we're coming from container details to show a "back" button
+    from_container = bool(container_id)
     
     return render_template('products.html', 
                          client=client, 
                          products=products,
                          container_delivered=container_delivered,
-                         container=container)  # Pass container to the template
+                         container=container,
+                         from_container=from_container,
+                         container_id=container_id)  # Pass container information
 
 @app.route('/client/<int:id>/add_product', methods=['POST'])
 @login_required

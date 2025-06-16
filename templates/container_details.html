@@ -191,7 +191,7 @@
                                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                             </form>
                             {% if current_user.role == 'Admin' or current_user.role == 'Secretary' %}
-                            <button type="button" class="btn btn-success btn-sm" onclick="printClientRow('{{ shipment.id }}')">
+                            <button type="button" class="btn btn-success btn-sm" onclick="printClientRow({{ shipment.id }})">
                                 <i class="fas fa-print"></i>
                             </button>
                             {% endif %}
@@ -337,17 +337,35 @@ function toggleEditPartialInput(select) {
 
 function printClientRow(shipmentId) {
     const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
+    if (!row) {
+        console.error('Row not found for shipment ID:', shipmentId);
+        return;
+    }
+    
     const containerNumber = '{{ container.container_number }}';
     const isSurEtStart = {{ container.sur_et_start|tojson }};  // Get container's sur_et_start status
     
-    // Get text content from view-mode spans
-    const clientName = row.querySelector('td:nth-child(2) .view-mode').textContent;
-    const clientMark = row.querySelector('td:nth-child(1) .view-mode').textContent;
-    const clientPhone = row.querySelector('td:nth-child(3) .view-mode').textContent;
-    const volume = row.querySelector('td:nth-child(4) .view-mode').textContent;
-    const price = row.querySelector('td:nth-child(5) .view-mode').textContent.replace('AED', '').trim();
-    const extraCharge = row.querySelector('td:nth-child(6) .view-mode').textContent.replace('AED', '').trim();
-    const paymentStatus = row.querySelector('td:nth-child(8) .view-mode').textContent;
+    // Get client mark from the link in the second column
+    const clientMarkLink = row.querySelector('td:nth-child(2) a.client-mark-link');
+    const clientMark = clientMarkLink ? clientMarkLink.textContent.trim() : '';
+    
+    // Get client name from the third column
+    const clientName = row.querySelector('td:nth-child(3)').textContent.trim();
+    
+    // Get phone from the fourth column
+    const clientPhone = row.querySelector('td:nth-child(4) .view-mode').textContent.trim();
+    
+    // Get volume from the fifth column
+    const volume = row.querySelector('td:nth-child(5) .view-mode').textContent.trim();
+    
+    // Get price from the sixth column
+    const price = row.querySelector('td:nth-child(6) .view-mode').textContent.replace('AED', '').trim();
+    
+    // Get extra charge from the seventh column
+    const extraCharge = row.querySelector('td:nth-child(7) .view-mode').textContent.replace('AED', '').trim();
+    
+    // Get payment status from the ninth column
+    const paymentStatus = row.querySelector('td:nth-child(9) .view-mode').textContent.trim();
     
     // Calculate the actual full total (price + extra charge)
     const priceValue = parseFloat(price.replace(',', '')) || 0;

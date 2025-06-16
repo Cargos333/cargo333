@@ -292,22 +292,77 @@ function toggleEditMode(shipmentId) {
 
 function saveShipment(shipmentId) {
     const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
-    const formData = new FormData();
-    
-    row.querySelectorAll('input, select').forEach(input => {
-        formData.append(input.name, input.value);
-    });
-    
-    fetch(`/shipment/${shipmentId}/edit`, {
-        method: 'POST',
-        body: formData
-    }).then(response => {
-        if (response.ok) {
+    if (!row) {
+        console.error('Row not found');
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        
+        // Extract all form fields from the row
+        const clientName = row.querySelector('td:nth-child(3)').textContent.trim();
+        const clientMark = row.querySelector('td:nth-child(2) a.client-mark-link').textContent.trim();
+        const clientPhone = row.querySelector('input[name="client_phone"]').value;
+        const volume = row.querySelector('input[name="volume"]').value;
+        const price = row.querySelector('input[name="price"]').value;
+        const extraCharge = row.querySelector('input[name="extra_charge"]').value;
+        const paymentStatus = row.querySelector('select[name="payment_status"]').value;
+        const paidAmount = row.querySelector('input[name="paid_amount"]').value;
+        
+        // Add all fields to formData
+        formData.append('client_name', clientName);
+        formData.append('client_mark', clientMark);
+        formData.append('client_phone', clientPhone);
+        formData.append('volume', volume);
+        formData.append('price', price);
+        formData.append('extra_charge', extraCharge || 0);
+        formData.append('payment_status', paymentStatus);
+        formData.append('paid_amount', paidAmount || 0);
+        
+        // Debug data being sent
+        console.log('Submitting shipment update with data:', {
+            shipmentId,
+            clientName,
+            clientMark,
+            clientPhone,
+            volume,
+            price,
+            extraCharge,
+            paymentStatus,
+            paidAmount
+        });
+        
+        // Send the data to the server
+        fetch(`/shipment/${shipmentId}/edit`, {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || response.statusText);
+                }).catch(e => {
+                    throw new Error(response.statusText);
+                });
+            }
+            return response.text();
+        }).then(data => {
+            // Success - reload the page to show updated data
             window.location.reload();
-        } else {
-            alert('Error updating client');
-        }
-    });
+        }).catch(error => {
+            console.error('Error updating shipment:', error);
+            alert(`Error updating client: ${error.message}`);
+            
+            // Return the row to view mode
+            toggleEditMode(shipmentId);
+        });
+    } catch (e) {
+        console.error('Exception in saveShipment:', e);
+        alert(`Error processing form data: ${e.message}`);
+        
+        // Return the row to view mode
+        toggleEditMode(shipmentId);
+    }
 }
 
 function updateTotalPrice(extraChargeInput) {

@@ -434,10 +434,23 @@ def container_search():
     
     # If searching for a specific container
     if search_query:
+        # First try exact match on container number
         selected_container = Container.query.filter(
             Container.container_number == search_query,
             Container.status != 'delivered'
         ).first()
+        
+        # If not found, try a broader search that includes partial matches in the container number
+        if not selected_container:
+            selected_container = Container.query.filter(
+                Container.container_number.ilike(f"%{search_query}%"),
+                Container.status != 'delivered'
+            ).first()
+        
+        # If found, load the shipments to ensure they're available for display
+        if selected_container:
+            # Explicitly load shipments with ordering to ensure consistent display
+            selected_container.shipments = Shipment.query.filter_by(container_id=selected_container.id).order_by(Shipment.id).all()
     
     return render_template('container_search.html', 
                          containers_by_destination=containers_by_destination,
@@ -1131,7 +1144,7 @@ def client_outstanding_payments(mark):
         
         # Get ALL client IDs that match this mark (case insensitive)
         client_ids = [c.id for c in clients]
-        primary_client = clients[0]  # Use the first matching client for name display
+        primary_client = clients[0] # Use the first matching client for name display
         
         # Log what we're searching for
         app.logger.info(f"Searching for outstanding payments for mark '{mark}', found clients: {client_ids}")

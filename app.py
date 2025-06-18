@@ -1250,6 +1250,271 @@ def resolve_outstanding_payments():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/client-records')
+@login_required
+def client_records():
+    """Page to display detailed records of all clients"""
+    search_query = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 50  # Number of records per page
+    
+    # Explicitly check the group_by_mark value - it should always be present now
+    group_by_mark_param = request.args.get('group_by_mark', 'true')
+    # Convert string to boolean - anything other than 'true' (case-insensitive) is False
+    group_by_mark = group_by_mark_param.lower() == 'true'
+    
+    if group_by_mark:
+        # First, get unique client marks
+        subq = db.session.query(
+            Client.mark, 
+            db.func.min(Client.id).label('min_id')
+        ).group_by(Client.mark)
+        
+        if search_query:
+            subq = subq.filter(
+                db.or_(
+                    Client.mark.ilike(f'%{search_query}%'),
+                    Client.name.ilike(f'%{search_query}%'),
+                    Client.phone.ilike(f'%{search_query}%')
+                )
+            )
+        
+        subq = subq.subquery()
+        
+        # Now, get one client per unique mark
+        client_query = db.session.query(Client).join(
+            subq,
+            Client.id == subq.c.min_id
+        )
+    else:
+        # Base query for clients (show all)
+        client_query = Client.query
+        
+        # Apply search if provided
+        if search_query:
+            client_query = client_query.filter(
+                db.or_(
+                    Client.name.ilike(f'%{search_query}%'),
+                    Client.mark.ilike(f'%{search_query}%'),
+                    Client.phone.ilike(f'%{search_query}%')
+                )
+            )
+    
+    # Get paginated clients
+    pagination = client_query.order_by(Client.mark).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    clients = pagination.items
+    
+    # Get client marks for looking up duplicates
+    all_marks = {c.mark.lower(): [] for c in clients}
+    duplicate_client_ids = []
+    
+    # Find all clients with same marks and collect their IDs
+    if group_by_mark:
+        for client in clients:
+            # Get all clients with the same mark
+            duplicate_clients = Client.query.filter(
+                db.func.lower(Client.mark) == client.mark.lower()
+            ).all()
+            all_marks[client.mark.lower()] = duplicate_clients
+            
+            # Add their IDs to our list for data collection
+            for dup in duplicate_clients:
+                duplicate_client_ids.append(dup.id)
+    
+    # Get all client IDs we need to fetch data for
+    client_ids = duplicate_client_ids if group_by_mark else [c.id for c in clients]
+    
+    # Get all shipments for these clients
+    all_shipments = db.session.query(
+        Shipment, Client, Container
+    ).join(
+        Client, Shipment.client_id == Client.id
+    ).join(
+        Container, Shipment.container_id == Container.id
+    ).filter(
+        Shipment.client_id.in_(client_ids)
+    ).all()
+    
+    # Organize shipments by client ID
+    client_shipments = {}
+    for shipment, client, container in all_shipments:
+        if client.id not in client_shipments:
+            client_shipments[client.id] = []
+        client_shipments[client.id].append((shipment, container))
+    
+    # Get volumes, product counts, and latest containers for all clients
+    volumes_dict = {}
+    product_counts_dict = {}
+    latest_container_dict = {}
+    outstanding_dict = {}
+    
+    # For each client, calculate their stats
+    for client_id in client_ids:
+        # Get this client's shipments
+        shipments_list = client_shipments.get(client_id, [])
+        
+        # Calculate total volume
+        total_volume = sum(shipment.volume for shipment, _ in shipments_list)
+        volumes_dict[client_id] = total_volume
+        
+        # Count shipments
+        shipment_count = len(shipments_list)
+        
+        # Get product count for this client
+        product_count = db.session.query(db.func.count(Product.id)).filter(
+            Product.client_id == client_id
+        ).scalar()
+        product_counts_dict[client_id] = product_count
+        
+        # Find latest container
+        if shipments_list:
+            # Sort by shipment ID to get the newest one
+            latest_shipment, latest_container = max(shipments_list, key=lambda x: x[0].id)
+            latest_container_dict[client_id] = latest_container
+            
+            # Calculate outstanding payments
+            outstanding = 0
+            for shipment, container in shipments_list:
+                if container.status == 'delivered' and shipment.payment_status in ['unpaid', 'partial']:
+                    total_price = shipment.price + shipment.extra_charge
+                    paid = shipment.paid_amount or 0
+                    outstanding += (total_price - paid)
+            
+            outstanding_dict[client_id] = outstanding
+    
+    # Build the enhanced records with all data from our efficient queries
+    enhanced_records = []
+    for client in clients:
+        # Get all duplicates for this mark
+        if group_by_mark and client.mark.lower() in all_marks:
+            duplicates = all_marks[client.mark.lower()]
+            duplicate_ids = [c.id for c in duplicates]
+            duplicate_count = len(duplicates)
+            
+            # Create a list of detailed info for each duplicate client
+            duplicate_details = []
+            for dup in duplicates:
+                # Get stats for this specific duplicate
+                duplicate_details.append({
+                    'client': dup,
+                    'shipment_count': len(client_shipments.get(dup.id, [])),
+                    'total_volume': volumes_dict.get(dup.id, 0),
+                    'outstanding_payments': outstanding_dict.get(dup.id, 0),
+                    'latest_container': latest_container_dict.get(dup.id),
+                    'product_count': product_counts_dict.get(dup.id, 0)
+                })
+            
+            # Aggregate stats for the main display
+            enhanced_records.append({
+                'client': client,
+                'shipment_count': sum(len(client_shipments.get(cid, [])) for cid in duplicate_ids),
+                'total_volume': sum(volumes_dict.get(cid, 0) for cid in duplicate_ids),
+                'outstanding_payments': sum(outstanding_dict.get(cid, 0) for cid in duplicate_ids),
+                'latest_container': latest_container_dict.get(client.id),
+                'product_count': sum(product_counts_dict.get(cid, 0) for cid in duplicate_ids),
+                'duplicate_count': duplicate_count,
+                'duplicates': duplicate_details
+            })
+        else:
+            # Single client record
+            enhanced_records.append({
+                'client': client,
+                'shipment_count': len(client_shipments.get(client.id, [])),
+                'total_volume': volumes_dict.get(client.id, 0),
+                'outstanding_payments': outstanding_dict.get(client.id, 0),
+                'latest_container': latest_container_dict.get(client.id),
+                'product_count': product_counts_dict.get(client.id, 0),
+                'duplicate_count': 1,
+                'duplicates': [{
+                    'client': client,
+                    'shipment_count': len(client_shipments.get(client.id, [])),
+                    'total_volume': volumes_dict.get(client.id, 0),
+                    'outstanding_payments': outstanding_dict.get(client.id, 0),
+                    'latest_container': latest_container_dict.get(client.id),
+                    'product_count': product_counts_dict.get(client.id, 0)
+                }]
+            })
+    
+    # Get total unique marks count for pagination
+    if group_by_mark:
+        total_clients = db.session.query(db.func.count(db.distinct(db.func.lower(Client.mark)))).scalar()
+    else:
+        total_clients = client_query.count()
+    
+    return render_template(
+        'client_records.html',
+        records=enhanced_records,
+        search_query=search_query,
+        total_clients=total_clients,
+        pagination=pagination,
+        group_by_mark=group_by_mark,
+        client_shipments=client_shipments
+    )
+
+# Add new routes for editing and deleting clients
+
+@app.route('/client/<int:id>/edit', methods=['POST'])
+@login_required
+def edit_client(id):
+    """Edit client details"""
+    try:
+        client = Client.query.get_or_404(id)
+        
+        # Update client information
+        client.name = request.form.get('name')
+        client.mark = request.form.get('mark')
+        client.phone = request.form.get('phone')
+        
+        db.session.commit()
+        flash(f'Client "{client.mark}" updated successfully', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating client: {str(e)}', 'danger')
+    
+    # Redirect back to the client records page with previous search/filters
+    search_query = request.args.get('search', '')
+    page = request.args.get('page', 1)
+    group_by_mark = request.args.get('group_by_mark', 'true')
+    
+    return redirect(url_for('client_records', search=search_query, page=page, group_by_mark=group_by_mark))
+
+@app.route('/client/<int:id>/delete_from_records', methods=['POST'])
+@login_required
+def delete_client_from_records(id):
+    """Delete client from client records"""
+    try:
+        client = Client.query.get_or_404(id)
+        client_mark = client.mark  # Save for flash message
+        
+        # Check if client has products
+        product_count = Product.query.filter_by(client_id=id).count()
+        if product_count > 0:
+            # Delete associated products
+            Product.query.filter_by(client_id=id).delete()
+        
+        # Delete associated shipments
+        Shipment.query.filter_by(client_id=id).delete()
+        
+        # Delete client
+        db.session.delete(client)
+        db.session.commit()
+        
+        flash(f'Client "{client_mark}" and all associated data deleted successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting client: {str(e)}', 'danger')
+    
+    # Redirect back to the client records page with previous search/filters
+    search_query = request.args.get('search', '')
+    page = request.args.get('page', 1)
+    group_by_mark = request.args.get('group_by_mark', 'true')
+    
+    return redirect(url_for('client_records', search=search_query, page=page, group_by_mark=group_by_mark))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

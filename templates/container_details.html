@@ -743,16 +743,21 @@ function lookupClient() {
         .catch(error => console.error('Error:', error));
 }
 
-// Add function to add outstanding amount as extra charge
+// Fix the addAsExtraCharge function to properly handle the outstanding amount
 function addAsExtraCharge(amount) {
     const extraChargeInput = document.getElementById('extra_charge');
     const clientMarkInput = document.getElementById('client_mark');
     
-    // If there's already a value, add to it
-    const currentValue = parseFloat(extraChargeInput.value) || 0;
-    const newValue = currentValue + amount;
+    // Make sure amount is treated as a number
+    amount = parseFloat(amount);
     
-    extraChargeInput.value = newValue.toFixed(2);
+    // If there's already a value, add to it
+    let currentValue = parseFloat(extraChargeInput.value) || 0;
+    
+    // Set the exact amount from the outstanding balance
+    // Instead of adding to any existing value, we're setting it directly
+    // as the notification shows the total outstanding amount
+    extraChargeInput.value = amount.toFixed(2);
     
     // Highlight the field briefly to draw attention
     extraChargeInput.classList.add('bg-warning');
@@ -781,9 +786,9 @@ function addAsExtraCharge(amount) {
     if (clientMark) {
         const formData = new FormData();
         formData.append('client_mark', clientMark);
-        formData.append('extra_charge', newValue);
+        formData.append('extra_charge', amount);  // Use the exact amount from parameter
         formData.append('resolve_outstanding', 'true');
-        formData.append('new_client', 'true');  // Flag to indicate we're adding a new client
+        formData.append('new_client', 'true');
         
         // Add a loading indicator
         const loadingIndicator = document.createElement('span');
@@ -792,6 +797,14 @@ function addAsExtraCharge(amount) {
         if (addButton) {
             addButton.after(loadingIndicator);
         }
+        
+        // Log the data being sent for debugging
+        console.log('Resolving outstanding payment:', {
+            client_mark: clientMark,
+            extra_charge: amount,
+            resolve_outstanding: true,
+            new_client: true
+        });
         
         fetch('/api/resolve-outstanding-payments', {
             method: 'POST',

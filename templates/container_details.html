@@ -191,9 +191,16 @@
                                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                             </form>
                             {% if current_user.role == 'Admin' or current_user.role == 'Secretary' %}
-                            <button type="button" class="btn btn-success btn-sm" onclick="printClientRow({{ shipment.id }})">
-                                <i class="fas fa-print"></i>
-                            </button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-success btn-sm" onclick="printClientRow({{ shipment.id }}, 'aed')">
+                                    <i class="fas fa-print"></i> AED
+                                </button>
+                                {% if current_user.role == 'Admin' %}
+                                <button type="button" class="btn btn-info btn-sm" onclick="printClientRow({{ shipment.id }}, 'eur')">
+                                    <i class="fas fa-print"></i> EUR
+                                </button>
+                                {% endif %}
+                            </div>
                             {% endif %}
                             {% if shipment.client.phone %}
                             <a href="https://wa.me/{{ shipment.client.phone|replace(' ', '')|replace('+', '') }}" 
@@ -390,7 +397,7 @@ function toggleEditPartialInput(select) {
     }
 }
 
-function printClientRow(shipmentId) {
+function printClientRow(shipmentId, currency = 'aed') {
     const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
     if (!row) {
         console.error('Row not found for shipment ID:', shipmentId);
@@ -425,8 +432,18 @@ function printClientRow(shipmentId) {
     // Calculate the actual full total (price + extra charge)
     const priceValue = parseFloat(price.replace(',', '')) || 0;
     const extraChargeValue = parseFloat(extraCharge.replace(',', '')) || 0;
-    const fullTotal = priceValue + extraChargeValue;
-    const formattedFullTotal = `AED ${fullTotal.toLocaleString()}`;
+    const fullTotalAED = priceValue + extraChargeValue;
+    
+    // Convert to EUR if needed using formula: total amount * 132 / 500
+    let fullTotal = fullTotalAED;
+    let currencySymbol = 'AED';
+    
+    if (currency.toLowerCase() === 'eur') {
+        fullTotal = Math.round((fullTotalAED * 132) / 500);
+        currencySymbol = 'EUR';
+    }
+    
+    const formattedFullTotal = `${fullTotal.toLocaleString()} ${currencySymbol}`;
     
     const isPaid = paymentStatus.trim() === 'paid';
     const isPartial = paymentStatus.trim() === 'partial';
@@ -437,9 +454,15 @@ function printClientRow(shipmentId) {
     if (isPartial) {
         const paidInput = row.querySelector('input[name="paid_amount"]');
         if (paidInput) {
-            const paid = parseFloat(paidInput.value) || 0;
-            paidAmount = `AED ${paid.toLocaleString()}`;
-            remainingAmount = `AED ${(fullTotal - paid).toLocaleString()}`;
+            let paid = parseFloat(paidInput.value) || 0;
+            
+            // Convert paid amount to EUR if needed
+            if (currency.toLowerCase() === 'eur') {
+                paid = Math.round((paid * 132) / 500);
+            }
+            
+            paidAmount = `${paid.toLocaleString()} ${currencySymbol}`;
+            remainingAmount = `${(fullTotal - paid).toLocaleString()} ${currencySymbol}`;
         }
     }
     
@@ -611,7 +634,7 @@ function printClientRow(shipmentId) {
                 <table>
                     <tr>
                         <th>Volume (m³)</th>
-                        <th>Total (AED)</th>
+                        <th>Total (${currencySymbol})</th>
                     </tr>
                     <tr>
                         <td>${volume}</td>

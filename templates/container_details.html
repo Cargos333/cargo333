@@ -237,8 +237,8 @@
                     <td>{{ loop.index }}</td>
                     <td>
                         {% if client %}
-                        <a href="{{ url_for('client_products', id=client.id) }}" 
-                           title="View {{ client.mark }}'s products" class="client-mark-link">
+                                <a href="{{ url_for('client_products', id=client.id, container_id=container.id) }}" 
+                                    title="View {{ client.mark }}'s products" class="client-mark-link">
                             {{ client.mark }}
                         </a>
                         {% else %}
@@ -296,7 +296,7 @@
                             <option value="unpaid" {% if shipment.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
                             <option value="partial" {% if shipment.payment_status == 'partial' %}selected{% endif %}>Partial</option>
                         </select>
-               <input type="number" step="0.01" class="form-control edit-mode {{ 'd-block' if shipment.payment_status == 'partial' else 'd-none' }}" name="paid_amount" value="{{ shipment.paid_amount }}">
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="paid_amount" value="{{ shipment.paid_amount }}">
                     </td>
                     <td>
                         {% if container.status != 'delivered' %}
@@ -569,6 +569,15 @@ function toggleEditMode(shipmentId) {
     if (!rowIsEditing) {
         const editedInputs = row.querySelectorAll('.edit-mode input, .edit-mode select, .edit-mode textarea');
         editedInputs.forEach(i => { i.style.minWidth = ''; i.blur && i.blur(); });
+    }
+
+    // When entering edit mode, ensure the paid_amount input visibility matches the payment_status select
+    if (rowIsEditing) {
+        const paymentSelect = row.querySelector('select[name="payment_status"]');
+        if (paymentSelect && typeof toggleEditPartialInput === 'function') {
+            // ensure paid_amount input visibility is correct
+            toggleEditPartialInput(paymentSelect);
+        }
     }
 }
 
@@ -1076,6 +1085,15 @@ function addAsExtraCharge(amount) {
         }
     }
     
+    // Highlight the "Add Client" button to make it clear the user needs to submit the form
+    const addClientButton = document.querySelector('form[action*="add-client"] button[type="submit"]');
+    if (addClientButton) {
+        addClientButton.classList.add('btn-lg', 'btn-pulse');
+        addClientButton.innerHTML = '<i class="fas fa-arrow-right"></i> Click here to Add Client with Extra Charge';
+        // Scroll to the button
+        addClientButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
     // Call API to mark outstanding payments as resolved
     const clientMark = clientMarkInput.value;
     if (clientMark) {
@@ -1411,6 +1429,24 @@ document.head.insertAdjacentHTML('beforeend', `
         .client-mark-link:hover {
             text-decoration: underline;
             color: #0056b3;
+        }
+        
+        /* Pulse animation for "Add Client" button after adding extra charge */
+        .btn-pulse {
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
         }
 
         /* Ensure edit-mode inputs fit within their table cells */

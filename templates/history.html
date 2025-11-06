@@ -3,12 +3,24 @@
 <div class="container">
     <h1 class="mb-4">Delivered Containers</h1>
     
+    <!-- Search form -->
+    <form method="get" action="{{ url_for('history') }}" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Search by container number or name" value="{{ search_query if search_query is defined else request.args.get('search','') }}">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+            <a href="{{ url_for('history') }}" class="btn btn-outline-danger">Clear</a>
+        </div>
+    </form>
+
     <div class="row">
         {% for container in containers %}
         <div class="col-md-4 mb-4">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Container #{{ container.container_number }}</h5>
+                    {% if container.container_name %}
+                    <p class="card-subtitle mb-2 text-muted">Name: {{ container.container_name }}</p>
+                    {% endif %}
                     <p class="card-text">Type: {{ container.container_type }}</p>
                     <p class="card-text">Total Volume: {{ container.total_volume }} m³</p>
                     <p class="card-text">Clients: {{ container.shipments|length }}</p>

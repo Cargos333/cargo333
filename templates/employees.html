@@ -65,7 +65,21 @@
                         {% for employee in employees %}
                         <tr>
                             <td>{{ employee.username }}</td>
-                            <td>{{ employee.role }}</td>
+                            <td>
+                                {% if employee.id != current_user.id %}
+                                <form action="{{ url_for('update_employee_role', id=employee.id) }}" method="POST" class="d-flex align-items-center">
+                                    <select name="role" class="form-select form-select-sm me-2" style="width:140px;">
+                                        <option value="Admin" {% if employee.role == 'Admin' %}selected{% endif %}>Admin</option>
+                                        <option value="Secretary" {% if employee.role == 'Secretary' %}selected{% endif %}>Secretary</option>
+                                        <option value="Manager" {% if employee.role == 'Manager' %}selected{% endif %}>Manager</option>
+                                        <option value="Employee" {% if employee.role == 'Employee' %}selected{% endif %}>Employee</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                                </form>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ employee.role }} (You)</span>
+                                {% endif %}
+                            </td>
                             <td>{{ employee.full_name }}</td>
                             <td>{{ employee.email }}</td>
                             <td>{{ employee.phone }}</td>

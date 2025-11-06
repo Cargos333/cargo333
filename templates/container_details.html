@@ -2,11 +2,20 @@
 {% block content %}
 <div class="container">
     <h1>Container #{{ container.container_number }} Details</h1>
+    <!-- App config: expose server-side constants safely via data- attributes -->
+    <div id="app-config" data-tonne-to-m3="{{ container_tonne_to_m3 }}" data-container-price="{{ container.price }}" data-container-volume="{{ container.total_volume }}" style="display:none"></div>
+    <!-- Server-side values exposed safely to JS via data- attributes -->
+    <div id="server-data" data-container-number="{{ container.container_number }}" data-sur-et-start="{{ container.sur_et_start|tojson }}" style="display:none"></div>
     
     <!-- Container Information -->
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title">Container Information</h5>
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h5 class="card-title mb-0">Container Information</h5>
+                <div>
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editContainerModal">Edit Container</button>
+                </div>
+            </div>
             {% if container.container_name %}
             <p>Name: {{ container.container_name }}</p>
             {% endif %}
@@ -15,6 +24,61 @@
             <p>Price: AED {{ container.price|format_number }}</p>
             <p>Destination: {{ container.destination }}</p>
             <p>Available Volume: {{ container.total_volume - container.shipments|sum(attribute='volume') }} m³</p>
+        </div>
+    </div>
+
+    <!-- Edit Container Modal (top pop menu) -->
+    <div class="modal fade" id="editContainerModal" tabindex="-1" aria-labelledby="editContainerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document" style="margin-top:40px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editContainerModalLabel">Edit Container #{{ container.container_number }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ url_for('edit_container', id=container.id) }}" method="POST">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Container Number</label>
+                                <input type="text" name="container_number" class="form-control" value="{{ container.container_number }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Container Name</label>
+                                <input type="text" name="container_name" class="form-control" value="{{ container.container_name or '' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Container Type</label>
+                                <select name="container_type" class="form-select">
+                                    <option value="20ft" {% if container.container_type == '20ft' %}selected{% endif %}>20ft</option>
+                                    <option value="40ft" {% if container.container_type == '40ft' %}selected{% endif %}>40ft</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Destination</label>
+                                <input type="text" name="destination" class="form-control" value="{{ container.destination or '' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Total Volume (m³)</label>
+                                <input type="number" step="0.01" name="total_volume" class="form-control" value="{{ container.total_volume }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Price (AED)</label>
+                                <input type="number" step="0.01" name="price" class="form-control" value="{{ container.price }}" required>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="sur_et_start" id="surEtStart" {% if container.sur_et_start %}checked{% endif %}>
+                                    <label class="form-check-label" for="surEtStart">Mark as Sur ET STAR (High Priority)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -51,7 +115,11 @@
                         <input type="file" class="form-control" id="excel_file" name="file" 
                                accept=".xlsx" required>
                         <small class="form-text text-muted">
-                            Excel file should have columns: Client Mark, Client Name, Phone, Volume
+                            Excel file should have columns: Client Mark, Client Name, Phone, Goods Type, Volume, Volume Used, Tonnage, Price / Tonne
+                            <br>
+                            - Goods Type: one of Merchandise, Car, Metals
+                            <br>
+                            - For Metals provide Tonnage (t) and Price / Tonne (AED) if available; for Car provide Volume (Vide) and optionally Volume Used
                         </small>
                     </div>
                     <div class="col-md-4">
@@ -81,9 +149,38 @@
                         <label for="client_phone" class="form-label">Phone</label>
                         <input type="tel" class="form-control" id="client_phone" name="client_phone">
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
+                        <label for="goods_type" class="form-label">Goods Type</label>
+                        <select class="form-select" id="goods_type" name="goods_type" required onchange="onGoodsTypeChange()">
+                            <option value="Merchandise">Merchandise</option>
+                            <option value="Car">Car</option>
+                            <option value="Metals">Metals</option>
+                        </select>
+                    </div>
+                    <!-- Merchandise / Car computed volume -->
+                    <div class="col-md-6 mb-3" id="volume_group">
                         <label for="volume" class="form-label">Volume (m³)</label>
                         <input type="number" step="0.01" class="form-control" id="volume" name="volume" required onchange="calculatePrice()">
+                    </div>
+
+                    <!-- Car specific inputs -->
+                    <div class="col-md-6 mb-3 d-none" id="car_vide_group">
+                        <label for="volume_vide" class="form-label">Volume Vide (m³)</label>
+                        <input type="number" step="0.01" class="form-control" id="volume_vide" name="volume_vide" onchange="onCarVolumeChange()">
+                    </div>
+                    <div class="col-md-6 mb-3 d-none" id="car_used_group">
+                        <label for="volume_used" class="form-label">Volume Used (m³)</label>
+                        <input type="number" step="0.01" class="form-control" id="volume_used" name="volume_used" onchange="onCarVolumeChange()">
+                    </div>
+
+                    <!-- Metals specific inputs -->
+                    <div class="col-md-6 mb-3 d-none" id="metals_tonnage_group">
+                        <label for="tonnage" class="form-label">Tonnage (tonnes)</label>
+                        <input type="number" step="0.01" class="form-control" id="tonnage" name="tonnage" onchange="onMetalsChange()">
+                    </div>
+                    <div class="col-md-6 mb-3 d-none" id="metals_price_group">
+                        <label for="price_per_tonne" class="form-label">Price per Tonne (AED)</label>
+                        <input type="number" step="0.01" class="form-control" id="price_per_tonne" name="price_per_tonne" onchange="onMetalsChange()">
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="price" class="form-label">Price</label>
@@ -122,6 +219,9 @@
                     <th>Mark</th>
                     <th>Name</th>
                     <th>Phone</th>
+                    <th>Tonnage (t)</th>
+                    <th class="col-editable-header" style="display:none">Volume Vide (m³)</th>
+                    <th class="col-editable-header" style="display:none">Volume Used (m³)</th>
                     <th>Volume (m³)</th>
                     <th>Price (AED)</th>
                     <th>Extra Charge</th>
@@ -132,30 +232,49 @@
             </thead>
             <tbody>
                 {% for shipment in container.shipments %}
-                <tr data-client-mark="{{ shipment.client.mark }}" data-shipment-id="{{ shipment.id }}">
+                {% set client = shipment.client %}
+                <tr data-client-mark="{{ client.mark if client else '' }}" data-shipment-id="{{ shipment.id }}">
                     <td>{{ loop.index }}</td>
                     <td>
-                        <a href="{{ url_for('client_products', id=shipment.client.id) }}" 
-                           title="View {{ shipment.client.mark }}'s products" class="client-mark-link">
-                            {{ shipment.client.mark }}
+                        {% if client %}
+                        <a href="{{ url_for('client_products', id=client.id) }}" 
+                           title="View {{ client.mark }}'s products" class="client-mark-link">
+                            {{ client.mark }}
                         </a>
+                        {% else %}
+                        <span class="text-muted">Client #{{ shipment.client_id }}</span>
+                        {% endif %}
                         <span class="outstanding-badge badge bg-danger d-none" 
                               data-bs-toggle="tooltip" data-bs-placement="top">
                             <i class="fas fa-exclamation-circle"></i>
                         </span>
                     </td>
-                    <td>{{ shipment.client.name }}</td>
+                    <td>{{ client.name if client else 'Unknown' }}</td>
                     <td>
-                        <span class="view-mode">{{ shipment.client.phone }}</span>
-                        <input type="text" class="form-control edit-mode d-none" name="client_phone" value="{{ shipment.client.phone }}">
+                        <span class="view-mode">{{ client.phone if client else '' }}</span>
+                        <input type="text" class="form-control edit-mode d-none" name="client_phone" value="{{ client.phone if client else '' }}">
                     </td>
                     <td>
-                        <span class="view-mode">{{ shipment.volume }}</span>
+                        <span class="view-mode">{% if shipment.tonnage is not none %}{{ shipment.tonnage }}{% endif %}</span>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="tonnage" value="{% if shipment.tonnage is not none %}{{ shipment.tonnage }}{% else %}{% endif %}">
+                    </td>
+                    <td class="col-editable-cell" style="display:none">
+                        <span class="view-mode"><!-- hidden by default, shown only in edit mode --></span>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="volume_vide" value="{% if shipment.volume_vide is not none %}{{ shipment.volume_vide }}{% else %}{% endif %}">
+                    </td>
+                    <td class="col-editable-cell" style="display:none">
+                        <span class="view-mode"><!-- hidden by default, shown only in edit mode --></span>
+                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="volume_used" value="{% if shipment.volume_used is not none %}{{ shipment.volume_used }}{% else %}{% endif %}">
+                    </td>
+                    <td>
+                        <span class="view-mode">{% if shipment.tonnage is none %}{{ shipment.volume }}{% else %}{% endif %}</span>
                         <input type="number" step="0.01" class="form-control edit-mode d-none" name="volume" value="{{ shipment.volume }}" onchange="recalculatePrice(this)">
                     </td>
                     <td>
                         <span class="view-mode">{{ shipment.price|format_number }} AED</span>
                         <input type="number" step="0.01" class="form-control edit-mode d-none" name="price" value="{{ shipment.price }}" readonly>
+                        <!-- price_per_tonne for metals (edit only) -->
+                        <input type="number" step="0.01" class="form-control edit-mode d-none mt-1" name="price_per_tonne" value="{% if shipment.price_per_tonne is not none %}{{ shipment.price_per_tonne }}{% else %}{% endif %}" placeholder="Price per tonne">
                     </td>
                     <td>
                         <span class="view-mode">{{ shipment.extra_charge|format_number }} AED</span>
@@ -177,26 +296,25 @@
                             <option value="unpaid" {% if shipment.payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
                             <option value="partial" {% if shipment.payment_status == 'partial' %}selected{% endif %}>Partial</option>
                         </select>
-                        <input type="number" step="0.01" class="form-control edit-mode d-none" name="paid_amount" value="{{ shipment.paid_amount }}" 
-                               style="display: {% if shipment.payment_status == 'partial' %}block{% else %}none{% endif %};">
+               <input type="number" step="0.01" class="form-control edit-mode {{ 'd-block' if shipment.payment_status == 'partial' else 'd-none' }}" name="paid_amount" value="{{ shipment.paid_amount }}">
                     </td>
                     <td>
                         {% if container.status != 'delivered' %}
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-primary btn-sm view-mode" onclick="toggleEditMode({{ shipment.id }})">Edit</button>
-                            <button type="button" class="btn btn-success btn-sm edit-mode d-none" onclick="saveShipment({{ shipment.id }})">Save</button>
-                            <button type="button" class="btn btn-secondary btn-sm edit-mode d-none" onclick="toggleEditMode({{ shipment.id }})">Cancel</button>
+                            <button type="button" class="btn btn-primary btn-sm view-mode btn-toggle-edit" data-shipment-id="{{ shipment.id }}">Edit</button>
+                            <button type="button" class="btn btn-success btn-sm edit-mode d-none btn-save-shipment" data-shipment-id="{{ shipment.id }}">Save</button>
+                            <button type="button" class="btn btn-secondary btn-sm edit-mode d-none btn-cancel-shipment" data-shipment-id="{{ shipment.id }}">Cancel</button>
                             <form action="{{ url_for('delete_shipment', id=shipment.id) }}" method="POST" 
                                   onsubmit="return confirm('Are you sure you want to delete this client from the container?');" class="d-inline">
                                 <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                             </form>
                             {% if current_user.role == 'Admin' or current_user.role == 'Secretary' %}
                             <div class="btn-group">
-                                <button type="button" class="btn btn-success btn-sm" onclick="printClientRow({{ shipment.id }}, 'aed')">
+                                <button type="button" class="btn btn-success btn-sm btn-print-client" data-shipment-id="{{ shipment.id }}" data-currency="aed">
                                     <i class="fas fa-print"></i> AED
                                 </button>
                                 {% if current_user.role == 'Admin' %}
-                                <button type="button" class="btn btn-info btn-sm" onclick="printClientRow({{ shipment.id }}, 'eur')">
+                                <button type="button" class="btn btn-info btn-sm btn-print-client" data-shipment-id="{{ shipment.id }}" data-currency="eur">
                                     <i class="fas fa-print"></i> EUR
                                 </button>
                                 {% endif %}
@@ -219,6 +337,88 @@
 </div>
 
 <script>
+// Read server-provided config from hidden DOM element
+const _appConfigEl = document.getElementById('app-config');
+const _tonneToM3_from_config = _appConfigEl ? parseFloat(_appConfigEl.dataset.tonneToM3) || 1 : 1;
+const _containerPrice_from_config = _appConfigEl ? parseFloat(_appConfigEl.dataset.containerPrice) || 0 : 0;
+const _containerVolume_from_config = _appConfigEl ? parseFloat(_appConfigEl.dataset.containerVolume) || 0.001 : 0.001;
+// Handle goods type selection and show/hide appropriate inputs
+function onGoodsTypeChange() {
+    const goodsType = document.getElementById('goods_type').value;
+    const volumeGroup = document.getElementById('volume_group');
+    const carVide = document.getElementById('car_vide_group');
+    const carUsed = document.getElementById('car_used_group');
+    const metalsTonnage = document.getElementById('metals_tonnage_group');
+    const metalsPrice = document.getElementById('metals_price_group');
+
+    if (goodsType === 'Merchandise') {
+        volumeGroup.classList.remove('d-none');
+        // Allow manual editing of volume for Merchandise
+        const volInput = document.getElementById('volume');
+        if (volInput) { volInput.readOnly = false; volInput.removeAttribute('readonly'); volInput.required = true; }
+        // Clear/disable fields not needed for Merchandise
+        const tonnageInput = document.getElementById('tonnage');
+        const pptInput = document.getElementById('price_per_tonne');
+        if (tonnageInput) { tonnageInput.required = false; }
+        if (pptInput) { pptInput.required = false; }
+        const videInput = document.getElementById('volume_vide');
+        const usedInput = document.getElementById('volume_used');
+        if (videInput) { videInput.required = false; }
+        if (usedInput) { usedInput.required = false; }
+        carVide.classList.add('d-none');
+        carUsed.classList.add('d-none');
+        metalsTonnage.classList.add('d-none');
+        metalsPrice.classList.add('d-none');
+    } else if (goodsType === 'Car') {
+        volumeGroup.classList.remove('d-none');
+        const volInput = document.getElementById('volume');
+        if (volInput) { volInput.readOnly = true; volInput.required = true; }
+        carVide.classList.remove('d-none');
+        carUsed.classList.remove('d-none');
+        // Require vide/used for car calculation
+        const videInput = document.getElementById('volume_vide');
+        const usedInput = document.getElementById('volume_used');
+        if (videInput) { videInput.required = true; }
+        if (usedInput) { usedInput.required = true; }
+        metalsTonnage.classList.add('d-none');
+        metalsPrice.classList.add('d-none');
+    } else if (goodsType === 'Metals') {
+        volumeGroup.classList.remove('d-none');
+        const volInput2 = document.getElementById('volume');
+        if (volInput2) { volInput2.readOnly = true; volInput2.required = true; }
+        carVide.classList.add('d-none');
+        carUsed.classList.add('d-none');
+        metalsTonnage.classList.remove('d-none');
+        metalsPrice.classList.remove('d-none');
+        // Require metals inputs
+        const tonnageInput2 = document.getElementById('tonnage');
+        const pptInput2 = document.getElementById('price_per_tonne');
+        if (tonnageInput2) { tonnageInput2.required = true; }
+        if (pptInput2) { pptInput2.required = true; }
+    }
+    calculatePrice();
+}
+
+function onCarVolumeChange() {
+    const vide = parseFloat(document.getElementById('volume_vide').value) || 0;
+    const used = parseFloat(document.getElementById('volume_used').value) || 0;
+    const vol = Math.max(vide - used, 0);
+    document.getElementById('volume').value = vol.toFixed(2);
+    calculatePrice();
+}
+
+function onMetalsChange() {
+    const tonnage = parseFloat(document.getElementById('tonnage').value) || 0;
+    const pricePerTonne = parseFloat(document.getElementById('price_per_tonne').value) || 0;
+    // Use server-side TONNE_TO_M3 for conversion; embed via template variable if available
+    const tonneToM3 = _tonneToM3_from_config;
+    const vol = tonnage * tonneToM3;
+    document.getElementById('volume').value = vol.toFixed(2);
+    // Price is tonnage * pricePerTonne
+    const metalsPrice = Math.round(tonnage * pricePerTonne);
+    document.getElementById('price').value = metalsPrice;
+    console.debug('onMetalsChange:', { tonnage, pricePerTonne, tonneToM3, vol, metalsPrice });
+}
 function togglePartialPayment(select) {
     const partialDiv = document.getElementById('partial_payment_div');
     partialDiv.style.display = select.value === 'partial' ? 'block' : 'none';
@@ -267,18 +467,47 @@ function calculateClientPrice(containerPrice, containerVolume, clientVolume, ext
 }
 
 function calculatePrice() {
-    const containerPrice = {{ container.price }};
-    const containerVolume = {{ container.total_volume }};
-    const clientVolume = parseFloat(document.getElementById('volume').value) || 0;
+    const goodsType = document.getElementById('goods_type') ? document.getElementById('goods_type').value : 'Merchandise';
     const extraCharge = parseFloat(document.getElementById('extra_charge').value) || 0;
-    
+
+    if (goodsType === 'Metals') {
+        // For metals, use tonnage and price per tonne
+        const tonnage = parseFloat(document.getElementById('tonnage').value) || 0;
+        const pricePerTonne = parseFloat(document.getElementById('price_per_tonne').value) || 0;
+        const metalsPrice = Math.round(tonnage * pricePerTonne);
+        const tonneToM3 = _tonneToM3_from_config;
+        const vol = tonnage * tonneToM3;
+        document.getElementById('volume').value = vol.toFixed(2);
+        document.getElementById('price').value = metalsPrice;
+        console.debug('calculatePrice (Metals):', { tonnage, pricePerTonne, tonneToM3, vol, metalsPrice, extraCharge });
+        return;
+    }
+
+    // Car: compute volume from vide and used, then use proportional pricing
+    if (goodsType === 'Car') {
+        const vide = parseFloat(document.getElementById('volume_vide').value) || 0;
+        const used = parseFloat(document.getElementById('volume_used').value) || 0;
+        const clientVolume = Math.max(vide - used, 0);
+        document.getElementById('volume').value = clientVolume.toFixed(2);
+        const containerPrice = _containerPrice_from_config;
+        const containerVolume = _containerVolume_from_config;
+        const result = calculateClientPrice(containerPrice, containerVolume, clientVolume, extraCharge);
+        document.getElementById('price').value = result.basePrice;
+        console.debug('calculatePrice (Car):', { vide, used, clientVolume, result });
+        return;
+    }
+
+    // Default: Merchandise (proportional by volume)
+    const containerPrice = _containerPrice_from_config;
+    const containerVolume = _containerVolume_from_config;
+    const clientVolume = parseFloat(document.getElementById('volume').value) || 0;
     const result = calculateClientPrice(containerPrice, containerVolume, clientVolume, extraCharge);
     document.getElementById('price').value = result.basePrice;
 }
 
 function recalculatePrice(volumeInput) {
-    const containerPrice = {{ container.price }};
-    const containerVolume = {{ container.total_volume }};
+    const containerPrice = _containerPrice_from_config;
+    const containerVolume = _containerVolume_from_config;
     const clientVolume = parseFloat(volumeInput.value) || 0;
     const row = volumeInput.closest('tr');
     const priceInput = row.querySelector('input[name="price"]');
@@ -295,6 +524,52 @@ function toggleEditMode(shipmentId) {
     
     viewElements.forEach(el => el.classList.toggle('d-none'));
     editElements.forEach(el => el.classList.toggle('d-none'));
+
+    // Show or hide the editable column headers (Volume Vide / Volume Used)
+    const anyEditing = document.querySelector('.edit-mode:not(.d-none)') !== null;
+    document.querySelectorAll('.col-editable-header').forEach(h => {
+        h.style.display = anyEditing ? '' : 'none';
+    });
+
+    // Show or hide the editable cells for THIS ROW only
+    const editableCells = row.querySelectorAll('.col-editable-cell');
+    const rowIsEditing = row.querySelector('.edit-mode:not(.d-none)') !== null;
+    editableCells.forEach(cell => {
+        cell.style.display = rowIsEditing ? '' : 'none';
+    });
+    // Add a class to expand the row visually when editing so inputs are easier to see
+    if (rowIsEditing) {
+        row.classList.add('editing-row');
+        // scroll the row to center of viewport so user sees the expanded inputs
+        setTimeout(() => {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Focus the first editable input and give it extra min-width so user can edit comfortably
+            const firstInput = row.querySelector('.edit-mode input, .edit-mode select, .edit-mode textarea');
+            if (firstInput) {
+                try { firstInput.focus({ preventScroll: true }); } catch(e) { firstInput.focus(); }
+                // give the focused input more horizontal room (user can slide to see full length)
+                firstInput.style.minWidth = '480px';
+
+                // Ensure the table container scrolls horizontally so the focused input is visible
+                const tableContainer = row.closest('.table-responsive');
+                if (tableContainer) {
+                    const inputRect = firstInput.getBoundingClientRect();
+                    const containerRect = tableContainer.getBoundingClientRect();
+                    const offset = (inputRect.left - containerRect.left) - (containerRect.width / 4);
+                    tableContainer.scrollBy({ left: offset, behavior: 'smooth' });
+                }
+            }
+        }, 120);
+    } else {
+        row.classList.remove('editing-row');
+    }
+
+    // When leaving edit mode, remove any temporary minWidth we added
+    if (!rowIsEditing) {
+        const editedInputs = row.querySelectorAll('.edit-mode input, .edit-mode select, .edit-mode textarea');
+        editedInputs.forEach(i => { i.style.minWidth = ''; i.blur && i.blur(); });
+    }
 }
 
 function saveShipment(shipmentId) {
@@ -311,21 +586,29 @@ function saveShipment(shipmentId) {
         const clientName = row.querySelector('td:nth-child(3)').textContent.trim();
         const clientMark = row.querySelector('td:nth-child(2) a.client-mark-link').textContent.trim();
         const clientPhone = row.querySelector('input[name="client_phone"]').value;
-        const volume = row.querySelector('input[name="volume"]').value;
-        const price = row.querySelector('input[name="price"]').value;
+    const volume = row.querySelector('input[name="volume"]').value;
+    const price = row.querySelector('input[name="price"]').value;
+    const tonnage = row.querySelector('input[name="tonnage"]') ? row.querySelector('input[name="tonnage"]').value : '';
+    const pricePerTonne = row.querySelector('input[name="price_per_tonne"]') ? row.querySelector('input[name="price_per_tonne"]').value : '';
+    const volumeVide = row.querySelector('input[name="volume_vide"]') ? row.querySelector('input[name="volume_vide"]').value : '';
+    const volumeUsed = row.querySelector('input[name="volume_used"]') ? row.querySelector('input[name="volume_used"]').value : '';
         const extraCharge = row.querySelector('input[name="extra_charge"]').value;
         const paymentStatus = row.querySelector('select[name="payment_status"]').value;
         const paidAmount = row.querySelector('input[name="paid_amount"]').value;
         
         // Add all fields to formData
-        formData.append('client_name', clientName);
-        formData.append('client_mark', clientMark);
-        formData.append('client_phone', clientPhone);
-        formData.append('volume', volume);
-        formData.append('price', price);
-        formData.append('extra_charge', extraCharge || 0);
-        formData.append('payment_status', paymentStatus);
-        formData.append('paid_amount', paidAmount || 0);
+    formData.append('client_name', clientName);
+    formData.append('client_mark', clientMark);
+    formData.append('client_phone', clientPhone);
+    formData.append('volume', volume);
+    formData.append('tonnage', tonnage);
+    formData.append('price_per_tonne', pricePerTonne);
+    formData.append('volume_vide', volumeVide);
+    formData.append('volume_used', volumeUsed);
+    formData.append('price', price);
+    formData.append('extra_charge', extraCharge || 0);
+    formData.append('payment_status', paymentStatus);
+    formData.append('paid_amount', paidAmount || 0);
         
         // Debug data being sent
         console.log('Submitting shipment update with data:', {
@@ -403,290 +686,279 @@ function printClientRow(shipmentId, currency = 'aed') {
         console.error('Row not found for shipment ID:', shipmentId);
         return;
     }
-    
-    const containerNumber = '{{ container.container_number }}';
-    const isSurEtStart = {{ container.sur_et_start|tojson }};  // Get container's sur_et_start status
-    
-    // Get client mark from the link in the second column
-    const clientMarkLink = row.querySelector('td:nth-child(2) a.client-mark-link');
-    const clientMark = clientMarkLink ? clientMarkLink.textContent.trim() : '';
-    
-    // Get client name from the third column
-    const clientName = row.querySelector('td:nth-child(3)').textContent.trim();
-    
-    // Get phone from the fourth column
-    const clientPhone = row.querySelector('td:nth-child(4) .view-mode').textContent.trim();
-    
-    // Get volume from the fifth column
-    const volume = row.querySelector('td:nth-child(5) .view-mode').textContent.trim();
-    
-    // Get price from the sixth column
-    const price = row.querySelector('td:nth-child(6) .view-mode').textContent.replace('AED', '').trim();
-    
-    // Get extra charge from the seventh column
-    const extraCharge = row.querySelector('td:nth-child(7) .view-mode').textContent.replace('AED', '').trim();
-    
-    // Get payment status from the ninth column
-    const paymentStatus = row.querySelector('td:nth-child(9) .view-mode').textContent.trim();
-    
-    // Calculate the actual full total (price + extra charge)
-    const priceValue = parseFloat(price.replace(',', '')) || 0;
-    const extraChargeValue = parseFloat(extraCharge.replace(',', '')) || 0;
-    const fullTotalAED = priceValue + extraChargeValue;
-    
-    // Convert to EUR if needed using formula: total amount * 132 / 500
-    let fullTotal = fullTotalAED;
-    let currencySymbol = 'AED';
-    
-    if (currency.toLowerCase() === 'eur') {
-        fullTotal = Math.round((fullTotalAED * 132) / 500);
-        currencySymbol = 'EUR';
-    }
-    
-    const formattedFullTotal = `${fullTotal.toLocaleString()} ${currencySymbol}`;
-    
-    const isPaid = paymentStatus.trim() === 'paid';
-    const isPartial = paymentStatus.trim() === 'partial';
-    
-    // Get paid amount for partial payments
-    let paidAmount = '';
-    let remainingAmount = '';
-    if (isPartial) {
-        const paidInput = row.querySelector('input[name="paid_amount"]');
-        if (paidInput) {
-            let paid = parseFloat(paidInput.value) || 0;
-            
-            // Convert paid amount to EUR if needed
-            if (currency.toLowerCase() === 'eur') {
-                paid = Math.round((paid * 132) / 500);
+
+    // Fetch shipment + product breakdown from server API
+    fetch(`/api/shipment-products/${shipmentId}`)
+        .then(r => {
+            // If we get a non-2xx response, surface status + body for debugging
+            if (!r.ok) {
+                return r.text().then(text => {
+                    throw new Error(`Server returned ${r.status} ${r.statusText}: ${text}`);
+                });
             }
-            
-            paidAmount = `${paid.toLocaleString()} ${currencySymbol}`;
-            remainingAmount = `${(fullTotal - paid).toLocaleString()} ${currencySymbol}`;
-        }
-    }
-    
-    const printWindow = window.open('', '', 'height=600,width=800');
-    
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>${clientMark} - Invoice</title>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif;
-                        padding: 40px;
-                        color: #333;
-                        line-height: 1.6;
-                    }
-                    .invoice {
-                        max-width: 800px;
-                        margin: 0 auto;
-                        background: #fff;
-                        border: 1px solid #ddd;
-                        padding: 30px;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                    }
-                    .header {
-                        border-bottom: 2px solid #2c3e50;
-                        padding-bottom: 20px;
-                        margin-bottom: 30px;
-                    }
-                    .header h2 {
-                        color: #2c3e50;
-                        margin: 0 0 15px 0;
-                        font-size: 24px;
-                    }
-                    .header p {
-                        margin: 5px 0;
-                        font-size: 14px;
-                    }
-                    .header strong {
-                        color: #2c3e50;
-                        display: inline-block;
-                        width: 100px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 20px 0;
-                        font-size: 14px;
-                    }
-                    th {
-                        background-color: #2c3e50;
-                        color: white;
-                        padding: 12px;
-                        text-align: left;
-                    }
-                    td {
-                        padding: 12px;
-                        border-bottom: 1px solid #ddd;
-                    }
-                    tr:nth-child(even) {
-                        background-color: #f9f9f9;
-                    }
-                    .contacts {
-                        margin-top: 40px;
-                        padding-top: 20px;
-                        border-top: 2px solid #2c3e50;
-                        font-size: 13px;
-                        color: #666;
-                    }
-                    .contact-row {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-top: 20px;
-                    }
-                    .contact-column {
-                        flex: 1;
-                        padding: 0 15px;
-                    }
-                    .contact-column h3 {
-                        color: #2c3e50;
-                        font-size: 14px;
-                        margin-bottom: 10px;
-                        text-align: center;
-                    }
-                    .contact-info {
-                        white-space: pre-line;
-                        line-height: 1.8;
-                    }
-                    .paid-stamp {
-                        position: absolute;
-                        top: 15%;
-                        right: 10%;
-                        transform: rotate(-30deg);
-                        color: rgba(220, 53, 69, 0.7); /* Bright red with transparency */
-                        font-size: 24px;
-                        font-weight: bold;
-                        font-family: 'Arial Black', sans-serif;
-                        text-align: center;
-                        border: 3px solid rgba(220, 53, 69, 0.7);
-                        border-radius: 8px;
-                        padding: 5px 10px;
-                        z-index: 999;
-                        pointer-events: none;
-                    }
-                    .status-badge {
-                        display: inline-block;
-                        padding: 5px 10px;
-                        border-radius: 5px;
-                        margin-top: 10px;
-                        font-weight: bold;
-                    }
-                    .status-priority {
-                        background-color: rgba(220, 53, 69, 0.2);
-                        color: #dc3545;
-                        border: 1px solid #dc3545;
-                    }
-                    .status-normal {
-                        background-color: rgba(25, 135, 84, 0.2);
-                        color: #198754;
-                        border: 1px solid #198754;
-                    }
-                    .payment-details {
-                        margin-top: 20px;
-                        border: 1px solid #ddd;
-                        border-radius: 5px;
-                        padding: 15px;
-                        background-color: #f9f9f9;
-                    }
-                    
-                    .payment-details table {
-                        width: 100%;
-                        margin-top: 10px;
-                    }
-                    
-                    .payment-details th {
-                        background-color: #f2f2f2;
-                        color: #333;
-                        text-align: left;
-                    }
-                    
-                    .payment-details .title {
-                        font-weight: bold;
-                        margin-bottom: 10px;
-                        color: #2c3e50;
-                    }
-                </style>
-            </head>
-            <body>
-                ${isPaid ? '<div class="paid-stamp">CARGO 333 PAID</div>' : ''}
-                
-                <div class="company-header">
-                    <h1>EURASIA SHIPPING SERVICE LLC</h1>
-                    <div>GATE NUMBER 1</div>
-                    <div>+971 4 239 9390</div>
-                    <div>Info@eurasiass.com</div>
-                    <div>AGENCE EURASIA</div>
-                </div>
 
-                <div class="header">
-                    <h2>Container #${containerNumber}</h2>
-                    <p><strong>Client Name:</strong> ${clientName}</p>
-                    <p><strong>Mark:</strong> ${clientMark}</p>
-                    <p><strong>Phone:</strong> ${clientPhone}</p>
-                    <div class="status-badge ${isSurEtStart ? 'status-priority' : 'status-normal'}">
-                        Status: ${isSurEtStart ? 'SUR ET START' : 'Normal Priority'}
-                    </div>
-                </div>
+            // Ensure the response is JSON before parsing
+            const contentType = r.headers.get('content-type') || '';
+            if (contentType.indexOf('application/json') === -1) {
+                return r.text().then(text => {
+                    throw new Error(`Expected JSON response but received: ${text}`);
+                });
+            }
 
-                <table>
-                    <tr>
-                        <th>Volume (m³)</th>
-                        <th>Total (${currencySymbol})</th>
-                    </tr>
-                    <tr>
-                        <td>${volume}</td>
-                        <td>${formattedFullTotal}</td>
-                    </tr>
-                </table>
-                
-                ${isPartial ? `
-                <div class="payment-details">
-                    <div class="title">Payment Details:</div>
+            return r.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert('Could not load invoice details');
+                console.error(data.error);
+                return;
+            }
+
+            // Read fallback server values from hidden DOM element to avoid embedding Jinja in JS
+            const _serverDataEl = document.getElementById('server-data');
+            const containerNumber = data.container_number || (_serverDataEl ? _serverDataEl.dataset.containerNumber : '');
+            const isSurEtStart = _serverDataEl ? (_serverDataEl.dataset.surEtStart === 'true' || _serverDataEl.dataset.surEtStart === 'True') : false;
+            const statusText = isSurEtStart ? 'Sur ET STAR' : 'Normal Priority';
+
+            const clientMark = data.client_mark || '';
+            const clientName = data.client_name || '';
+            // phone from row (client phone displayed in table)
+            const clientPhone = row.querySelector('td:nth-child(4) .view-mode').textContent.trim();
+
+            const shipmentPrice = parseFloat(data.shipment_price || 0);
+            const extraCharge = parseFloat(data.extra_charge || 0);
+            const paymentStatus = data.payment_status || '';
+            const paidAmountVal = parseFloat(data.paid_amount || 0);
+
+            // Group products by goods_type
+            const groups = {};
+            data.products.forEach(p => {
+                const gt = p.goods_type || 'Merchandise';
+                if (!groups[gt]) groups[gt] = [];
+                groups[gt].push(p);
+            });
+
+            // Money conversion helper - keep same formula used below for final total
+            const toEUR = (amount) => Math.round((parseFloat(amount) || 0) * 132 / 500);
+            const convertForCurrency = (amount) => {
+                if (currency && currency.toLowerCase() === 'eur') return toEUR(amount);
+                return Math.round(parseFloat(amount) || 0);
+            };
+
+            // Build products HTML (categorized)
+            let productsHtml = '';
+            let productsTotal = 0;
+            Object.keys(groups).forEach(cat => {
+                productsHtml += `<h4 style="margin-top:16px">${cat}</h4>`;
+                productsHtml += `
                     <table>
+                        <thead>
+                            <tr>
+                                <th>Ref</th>
+                                <th>Type</th>
+                                <th>Volume Vide (m³)</th>
+                                <th>Volume Used (m³)</th>
+                                <th>Qty / Tonnage</th>
+                                <th>Volume (m³)</th>
+                                <th>Price (${currency.toUpperCase()})</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                groups[cat].forEach(p => {
+                    const qtyOrT = p.goods_type === 'Metals' ? (p.tonnage || '') : (p.quantity != null ? p.quantity : '');
+                    const volVide = p.volume_vide != null ? (p.volume_vide !== '' ? p.volume_vide : '') : '';
+                    const volUsed = p.volume_used != null ? (p.volume_used !== '' ? p.volume_used : '') : '';
+                    const vol = (p.goods_type === 'Metals') ? (p.volume ? p.volume : '') : (p.volume ? p.volume : '');
+                    const priceRowRaw = parseFloat(p.allocated_price || 0);
+                    const priceRow = convertForCurrency(priceRowRaw);
+                    productsTotal += priceRow;
+
+                    productsHtml += `
                         <tr>
-                            <th>Total Amount</th>
-                            <th>Paid Amount</th>
-                            <th>Remaining Amount</th>
-                        </tr>
-                        <tr>
-                            <td>${formattedFullTotal}</td>
-                            <td>${paidAmount}</td>
-                            <td>${remainingAmount}</td>
-                        </tr>
+                            <td>${p.reference || ''}</td>
+                            <td>${p.goods_type || ''}</td>
+                            <td>${volVide !== null && volVide !== '' ? Number(volVide).toFixed(2) : '&nbsp;'}</td>
+                            <td>${volUsed !== null && volUsed !== '' ? Number(volUsed).toFixed(2) : '&nbsp;'}</td>
+                            <td>${qtyOrT !== null && qtyOrT !== '' ? (p.goods_type === 'Metals' ? Number(qtyOrT).toFixed(2) : qtyOrT) : '&nbsp;'}</td>
+                            <td>${vol !== null && vol !== '' ? Number(vol).toFixed(2) : '&nbsp;'}</td>
+                            <td>${Number(priceRow).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                        </tr>`;
+                });
+
+                productsHtml += `</tbody></table>`;
+            });
+
+            // Compute totals and format currency (convert shipment/extra/paid to target currency)
+            const productsTotalFormatted = Number(productsTotal).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+            // Compute total volumes (m3), total volume_vide/used and total tonnage for Metals
+            let totalVolume = 0;
+            let totalTonnage = 0;
+            let totalVolumeVide = 0;
+            let totalVolumeUsed = 0;
+            data.products.forEach(p => {
+                const vol = parseFloat(p.volume || 0) || 0;
+                totalVolume += vol;
+                const t = parseFloat(p.tonnage || 0) || 0;
+                totalTonnage += t;
+                const vide = parseFloat(p.volume_vide || 0) || 0;
+                totalVolumeVide += vide;
+                const used = parseFloat(p.volume_used || 0) || 0;
+                totalVolumeUsed += used;
+            });
+            const totalVolumeFormatted = Number(totalVolume).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            const totalTonnageFormatted = Number(totalTonnage).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            const totalVolumeVideFormatted = Number(totalVolumeVide).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            const totalVolumeUsedFormatted = Number(totalVolumeUsed).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+            const shipmentPriceDisplayVal = convertForCurrency(shipmentPrice);
+            const extraChargeDisplayVal = convertForCurrency(extraCharge);
+            const shipmentTotal = shipmentPriceDisplayVal + extraChargeDisplayVal;
+            let finalTotal = shipmentTotal;
+            const currencySymbol = (currency && currency.toLowerCase() === 'eur') ? 'EUR' : 'AED';
+
+            const formattedFullTotal = `${finalTotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} ${currencySymbol}`;
+
+            const isPaid = paymentStatus.trim() === 'paid';
+            const isPartial = paymentStatus.trim() === 'partial';
+            let paidAmount = '';
+            let remainingAmount = '';
+            if (isPartial) {
+                let paid = convertForCurrency(paidAmountVal || 0);
+                paidAmount = `${paid.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} ${currencySymbol}`;
+                remainingAmount = `${(finalTotal - paid).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} ${currencySymbol}`;
+            }
+
+            // Build and open print window with products details included
+            // Summary block showing total volume, volume vide/used and (if any) total tonnage
+            const totalsSummaryHtml = `
+                <div style="margin-top:8px;margin-bottom:12px;font-size:14px;">
+                    <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:6px;border-bottom:1px solid #ddd;">Volume Vide (m³)</th>
+                                <th style="text-align:left;padding:6px;border-bottom:1px solid #ddd;">Volume Used (m³)</th>
+                                <th style="text-align:left;padding:6px;border-bottom:1px solid #ddd;">Volume (m³)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:6px;">${totalVolumeVideFormatted}</td>
+                                <td style="padding:6px;">${totalVolumeUsedFormatted}</td>
+                                <td style="padding:6px;">${totalVolumeFormatted}</td>
+                            </tr>
+                        </tbody>
                     </table>
-                </div>
-                ` : ''}
-                
-                <div class="contacts">
-                    <div class="contact-row">
-                        <div class="contact-column">
-                            <h3>Information in Dubai:</h3>
-                            <div class="contact-info">PAPA LALY: +971 55 309 9610
-AHMED: +971 55 215 4173</div>
+                    ${totalTonnage > 0 ? `<div style="margin-top:8px">Total Tonnage (t): <strong>${totalTonnageFormatted}</strong></div>` : ''}
+                </div>`;
+            const printWindow = window.open('', '', 'height=800,width=900');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>${clientMark} - Invoice</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                            .invoice { max-width: 800px; margin: 0 auto; background: #fff; border: 1px solid #ddd; padding: 30px; }
+                            .header { border-bottom: 2px solid #2c3e50; padding-bottom: 20px; margin-bottom: 20px; }
+                            .header h2 { color: #2c3e50; margin: 0 0 10px 0; font-size: 20px; }
+                            table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+                            th { background-color: #2c3e50; color: white; padding: 8px; text-align: left; }
+                            td { padding: 8px; border-bottom: 1px solid #ddd; }
+
+                            /* Contacts / footer styling for printed invoice */
+                            .contacts { margin-top:30px; font-size:13px; color:#444; border-top:1px solid #e6e6e6; padding-top:18px; }
+                            .contacts .columns { display:flex; gap: 28px; flex-wrap:wrap; }
+                            .contact { flex:1; min-width:220px; }
+                            .contact h4 { margin:0 0 6px 0; font-size:13px; color:#2c3e50; }
+                            .contact p { margin:4px 0; }
+                            .agency { margin-top:12px; }
+
+                            /* Header enhancements: status badge and client info box */
+                            .header-row { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+                            .header-left { display:flex; flex-direction:column; }
+                            .status-badge { display:inline-block; padding:6px 10px; border-radius:6px; color:white; font-weight:700; font-size:13px; margin-top:8px; }
+                            .status-danger { background: #c82333; }
+                            .status-normal { background: #198754; }
+                            .client-info { background:#f8f9fa; border:1px solid #e9ecef; padding:10px 12px; border-radius:6px; min-width:240px; }
+                            .client-info p { margin:4px 0; font-size:14px; }
+                            .client-info .label { color:#555; font-weight:600; margin-right:6px; }
+                        </style>
+                    </head>
+                    <body>
+                        ${isPaid ? '<div style="position:absolute;top:15%;right:10%;transform:rotate(-30deg);color:rgba(220,53,69,0.7);font-size:24px;font-weight:bold;border:3px solid rgba(220,53,69,0.7);padding:5px 10px;border-radius:8px;">CARGO 333 PAID</div>' : ''}
+                        <div class="header">
+                            <div class="header-row">
+                                <div class="header-left">
+                                    <h2>Container #${containerNumber}</h2>
+                                    <span class="status-badge ${isSurEtStart ? 'status-danger' : 'status-normal'}">${statusText}</span>
+                                </div>
+                                <div class="client-info">
+                                    <p><span class="label">Client Name:</span> ${clientName}</p>
+                                    <p><span class="label">Mark:</span> ${clientMark}</p>
+                                    <p><span class="label">Phone:</span> ${clientPhone}</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="contact-column">
-                            <h3>Information in Comoros:</h3>
-                            <div class="contact-info">MOHAMED ABDALLAH: 492 40 19
-AGENCE IN COMOROS:
-AGENCE ALVARO MORONI BACHA: 
-Tel: 338 91 61</div>
+
+                        <div>
+                            <h3>Products</h3>
+                            ${productsHtml}
+                            ${totalsSummaryHtml}
                         </div>
-                    </div>
-                </div>
-            </body>
-        </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 250);
+
+                        <table>
+                            <tr>
+                                    <th style="text-align:right">Products Total (${currencySymbol})</th>
+                                    <td style="width:200px;text-align:right">${productsTotalFormatted} ${currencySymbol}</td>
+                                </tr>
+                                <tr>
+                                    <th style="text-align:right">Shipment Price</th>
+                                    <td style="text-align:right">${Number(shipmentPriceDisplayVal).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})} ${currencySymbol}</td>
+                                </tr>
+                                <tr>
+                                    <th style="text-align:right">Extra Charge</th>
+                                    <td style="text-align:right">${Number(extraChargeDisplayVal).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})} ${currencySymbol}</td>
+                                </tr>
+                            <tr>
+                                <th style="text-align:right"><strong>Total</strong></th>
+                                <td style="text-align:right"><strong>${formattedFullTotal}</strong></td>
+                            </tr>
+                        </table>
+
+                        ${isPartial ? `<div style="margin-top:12px;border:1px solid #ddd;padding:10px;background:#f9f9f9;">` +
+                            `<strong>Payment Details:</strong><br/>Paid: ${paidAmount}<br/>Remaining: ${remainingAmount}</div>` : ''}
+
+                        <div class="contacts">
+                            <div class="columns">
+                                <div class="contact">
+                                    <h4>Information in Dubai</h4>
+                                    <p><strong>PAPA LALY</strong>: +971 55 309 9610</p>
+                                    <p><strong>AHMED</strong>: +971 55 215 4173</p>
+                                </div>
+                                <div class="contact">
+                                    <h4>Information in Comoros</h4>
+                                    <p><strong>MOHAMED ABDALLAH</strong>: 492 40 19 / 342 40 19</p>
+                                </div>
+                                <div class="contact agency">
+                                    <h4>Agence in Comoros</h4>
+                                    <p><strong>AGENCE ALVARO MORONI BACHA</strong></p>
+                                    <p>Tel: 338 91 61</p>
+                                </div>
+                            </div>
+                        </div>
+                    </body>
+                </html>
+            `);
+
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);
+        })
+        .catch(err => {
+            console.error('Failed to load shipment products:', err);
+            alert('Failed to load products for invoice');
+        });
 }
 
 // Modify the existing lookupClient function
@@ -1109,7 +1381,7 @@ function addOutstandingToExtraCharge(shipmentId, amount, clientMark) {
     }
 }
 
-// Add CSS for the outstanding badge
+// Add CSS for the outstanding badge and improve table edit layout
 document.head.insertAdjacentHTML('beforeend', `
     <style>
         .outstanding-badge {
@@ -1140,6 +1412,132 @@ document.head.insertAdjacentHTML('beforeend', `
             text-decoration: underline;
             color: #0056b3;
         }
+
+        /* Ensure edit-mode inputs fit within their table cells */
+        table.table td .form-control.edit-mode,
+        table.table td .form-control.edit-mode:focus {
+            width: 100% !important;
+            box-sizing: border-box;
+            min-width: 0; /* allow shrinking in fixed-layout cells */
+        }
+
+        /* Keep view-mode spans vertically aligned with inputs */
+        table.table td .view-mode {
+            display: block;
+            min-height: 38px;
+            padding-top: 6px;
+        }
+
+        /* Use percentage-based columns and wrapping to avoid horizontal scroll */
+    /* Allow horizontal scrolling if needed so users can slide to see full content */
+    .container > .table-responsive { overflow-x: auto; }
+        table.table { width: 100%; table-layout: fixed; }
+        /* Percent widths roughly matching prior layout but ensuring total <= 100% */
+        table.table thead th:nth-child(1), table.table tbody td:nth-child(1) { width: 4%; }
+        table.table thead th:nth-child(2), table.table tbody td:nth-child(2) { width: 8%; }
+        table.table thead th:nth-child(3), table.table tbody td:nth-child(3) { width: 20%; }
+        table.table thead th:nth-child(4), table.table tbody td:nth-child(4) { width: 10%; }
+        table.table thead th:nth-child(5), table.table tbody td:nth-child(5) { width: 6%; }
+        table.table thead th:nth-child(6), table.table tbody td:nth-child(6) { width: 7%; }
+        table.table thead th:nth-child(7), table.table tbody td:nth-child(7) { width: 7%; }
+        table.table thead th:nth-child(8), table.table tbody td:nth-child(8) { width: 7%; }
+        table.table thead th:nth-child(9), table.table tbody td:nth-child(9) { width: 8%; }
+        table.table thead th:nth-child(10), table.table tbody td:nth-child(10) { width: 6%; }
+        table.table thead th:nth-child(11), table.table tbody td:nth-child(11) { width: 9%; }
+        table.table thead th:nth-child(12), table.table tbody td:nth-child(12) { width: 6%; }
+        table.table thead th:nth-child(13), table.table tbody td:nth-child(13) { width: 12%; }
+
+    /* Allow content to wrap so full text is visible; if table is wider than container, allow horizontal scroll */
+    table.table td, table.table th { white-space: normal; word-break: break-word; }
+    /* Inputs should fill available width */
+    table.table td .form-control.edit-mode { max-width: 100%; width: 100%; box-sizing: border-box; }
+
+    /* Actions button group should wrap and not overflow the cell (leave as-is) */
+    .btn-group { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    
+    /* Styling for an expanded editing row so inputs are easier to see */
+    tr.editing-row td {
+        vertical-align: top;
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    tr.editing-row td .form-control.edit-mode {
+        min-height: 42px;
+        white-space: normal;
+    }
+    /* Mobile-specific improvements: allow horizontal sliding (like Products page) */
+    @media (max-width: 767px) {
+        /* Let the table be wider than the viewport so user can slide horizontally */
+        .table-responsive > table.table, .table-responsive table.table {
+            min-width: 1200px; /* increase so columns have more space */
+            table-layout: fixed; /* keep column widths stable when sliding */
+            font-size: 14px;
+        }
+
+        /* Column-specific min-widths to reduce truncation and prioritize important fields */
+        /* 2: Mark, 3: Name, 4: Phone, 8: Volume, 9: Price, 13: Actions */
+        .table-responsive table.table thead th:nth-child(2),
+        .table-responsive table.table tbody td:nth-child(2) { min-width: 140px; }
+
+        .table-responsive table.table thead th:nth-child(3),
+        .table-responsive table.table tbody td:nth-child(3) { min-width: 260px; }
+
+        .table-responsive table.table thead th:nth-child(4),
+        .table-responsive table.table tbody td:nth-child(4) { min-width: 140px; }
+
+        .table-responsive table.table thead th:nth-child(8),
+        .table-responsive table.table tbody td:nth-child(8) { min-width: 110px; }
+
+        .table-responsive table.table thead th:nth-child(9),
+        .table-responsive table.table tbody td:nth-child(9) { min-width: 120px; }
+
+        .table-responsive table.table thead th:nth-child(13),
+        .table-responsive table.table tbody td:nth-child(13) { min-width: 160px; }
+
+        /* Ensure the responsive container allows touch scrolling */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+        }
+
+        /* Make action buttons larger and allow wrapping */
+        .btn-group { gap: 6px; flex-wrap: wrap; }
+        .btn-group .btn { padding: 6px 8px; font-size: 13px; }
+
+        /* Provide more vertical spacing for readability */
+        table.table td, table.table th { padding: 10px 6px; }
+
+        /* Make view-mode spans take natural height and reduce the min-height used for desktop */
+        table.table td .view-mode { min-height: 28px; padding-top: 4px; }
+
+        /* Force single-line rows: prevent wrapping and use ellipsis for overflow */
+        table.table th, table.table td {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        /* Ensure view-mode inline elements also don't wrap */
+        table.table td .view-mode, table.table td .client-mark-link {
+            display: inline-block; /* allow ellipsis to work reliably */
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+        }
+
+        /* Inputs: allow them to still expand but avoid wrapping inside cells */
+        table.table td .form-control {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Make icons and clickable badges easier to tap */
+        .outstanding-badge i { font-size: 1.1rem; }
+    }
     </style>
 `);
 
@@ -1155,10 +1553,223 @@ document.addEventListener('DOMContentLoaded', function() {
     checkOutstandingPaymentsForTable();
 });
 
+// Delegated click handlers for buttons that previously used inline onclick attributes
+document.addEventListener('click', function(event) {
+    const toggleBtn = event.target.closest('.btn-toggle-edit');
+    if (toggleBtn) {
+        const id = toggleBtn.dataset.shipmentId;
+        if (id) {
+            openEditShipmentModal(id);
+        }
+        return;
+    }
+
+    const saveBtn = event.target.closest('.btn-save-shipment');
+    if (saveBtn) {
+        const id = saveBtn.dataset.shipmentId;
+        if (id) saveShipment(id);
+        return;
+    }
+
+    const cancelBtn = event.target.closest('.btn-cancel-shipment');
+    if (cancelBtn) {
+        const id = cancelBtn.dataset.shipmentId;
+        if (id) toggleEditMode(id);
+        return;
+    }
+
+    const printBtn = event.target.closest('.btn-print-client');
+    if (printBtn) {
+        const id = printBtn.dataset.shipmentId;
+        const currency = printBtn.dataset.currency || 'aed';
+        if (id) printClientRow(id, currency);
+        return;
+    }
+});
+
 // Add a reload function that's called after resolving payments
 function reloadAfterResolving() {
     // Refresh only the outstanding badges without reloading the page
     checkOutstandingPaymentsForTable();
 }
+</script>
+<!-- Edit Shipment Modal (top pop menu for editing a client/shipment) -->
+<div class="modal fade" id="editShipmentModal" tabindex="-1" aria-labelledby="editShipmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document" style="margin-top:30px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editShipmentModalLabel">Edit Client / Shipment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editShipmentForm" action="#" method="POST">
+                <div class="modal-body">
+                    <div id="editShipmentAlert"></div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Client Mark</label>
+                            <input type="text" id="modal_client_mark" class="form-control" disabled>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Client Name</label>
+                            <input type="text" id="modal_client_name" class="form-control" disabled>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" name="client_phone" id="modal_client_phone" class="form-control">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Tonnage (t)</label>
+                            <input type="number" step="0.01" name="tonnage" id="modal_tonnage" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Volume Vide (m³)</label>
+                            <input type="number" step="0.01" name="volume_vide" id="modal_volume_vide" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Volume Used (m³)</label>
+                            <input type="number" step="0.01" name="volume_used" id="modal_volume_used" class="form-control">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Volume (m³)</label>
+                            <input type="number" step="0.01" name="volume" id="modal_volume" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Price (AED)</label>
+                            <input type="number" step="0.01" id="modal_price" class="form-control" disabled>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Price per Tonne</label>
+                            <input type="number" step="0.01" name="price_per_tonne" id="modal_price_per_tonne" class="form-control">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Extra Charge</label>
+                            <input type="number" step="0.01" name="extra_charge" id="modal_extra_charge" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Status</label>
+                            <select name="payment_status" id="modal_payment_status" class="form-select">
+                                <option value="paid">Paid</option>
+                                <option value="unpaid">Unpaid</option>
+                                <option value="partial">Partial</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Paid Amount</label>
+                            <input type="number" step="0.01" name="paid_amount" id="modal_paid_amount" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openEditShipmentModal(shipmentId) {
+    // Find the row for this shipment
+    const row = document.querySelector(`tr[data-shipment-id="${shipmentId}"]`);
+    if (!row) {
+        alert('Could not find shipment row to edit');
+        return;
+    }
+
+    // Populate modal fields from the row
+    const clientMark = row.querySelector('td:nth-child(2) a.client-mark-link') ? row.querySelector('td:nth-child(2) a.client-mark-link').textContent.trim() : '';
+    const clientName = row.querySelector('td:nth-child(3)').textContent.trim();
+    const clientPhoneView = row.querySelector('td:nth-child(4) .view-mode');
+    const clientPhone = clientPhoneView ? clientPhoneView.textContent.trim() : '';
+    const tonnageInput = row.querySelector('input[name="tonnage"]');
+    const volumeVideInput = row.querySelector('input[name="volume_vide"]');
+    const volumeUsedInput = row.querySelector('input[name="volume_used"]');
+    const volumeInput = row.querySelector('input[name="volume"]');
+    const priceInput = row.querySelector('input[name="price"]');
+    const pricePerTonneInput = row.querySelector('input[name="price_per_tonne"]');
+    const extraChargeInput = row.querySelector('input[name="extra_charge"]');
+    const paymentStatusSelect = row.querySelector('select[name="payment_status"]');
+    const paidAmountInput = row.querySelector('input[name="paid_amount"]');
+
+    document.getElementById('modal_client_mark').value = clientMark;
+    document.getElementById('modal_client_name').value = clientName;
+    document.getElementById('modal_client_phone').value = clientPhone;
+    document.getElementById('modal_tonnage').value = tonnageInput ? tonnageInput.value : '';
+    document.getElementById('modal_volume_vide').value = volumeVideInput ? volumeVideInput.value : '';
+    document.getElementById('modal_volume_used').value = volumeUsedInput ? volumeUsedInput.value : '';
+    document.getElementById('modal_volume').value = volumeInput ? volumeInput.value : '';
+    document.getElementById('modal_price').value = priceInput ? priceInput.value : '';
+    document.getElementById('modal_price_per_tonne').value = pricePerTonneInput ? pricePerTonneInput.value : '';
+    document.getElementById('modal_extra_charge').value = extraChargeInput ? extraChargeInput.value : 0;
+    document.getElementById('modal_payment_status').value = paymentStatusSelect ? paymentStatusSelect.value : 'unpaid';
+    document.getElementById('modal_paid_amount').value = paidAmountInput ? paidAmountInput.value : '';
+
+    // Set form action to the shipment edit URL
+    const form = document.getElementById('editShipmentForm');
+    form.action = `/shipment/${shipmentId}/edit`;
+
+    // Show Bootstrap modal
+    const modalEl = document.getElementById('editShipmentModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+// Optional: when the modal's payment_status changes, toggle visibility of paid_amount
+document.getElementById('modal_payment_status').addEventListener('change', function() {
+    const paidField = document.getElementById('modal_paid_amount');
+    if (this.value === 'partial') {
+        paidField.parentElement.style.display = '';
+    } else {
+        paidField.parentElement.style.display = 'block';
+        if (this.value === 'paid') paidField.value = document.getElementById('modal_price').value || 0;
+        if (this.value === 'unpaid') paidField.value = 0;
+    }
+});
+
+// Calculate price shown in the Edit Shipment modal when volume/tonnage/etc change
+function calculateModalPrice() {
+    const modalTonnage = parseFloat(document.getElementById('modal_tonnage').value) || 0;
+    const modalPPT = parseFloat(document.getElementById('modal_price_per_tonne').value) || 0;
+    const modalVolumeVide = parseFloat(document.getElementById('modal_volume_vide').value) || 0;
+    const modalVolumeUsed = parseFloat(document.getElementById('modal_volume_used').value) || 0;
+    const modalVolume = parseFloat(document.getElementById('modal_volume').value) || 0;
+    const extraCharge = parseFloat(document.getElementById('modal_extra_charge').value) || 0;
+
+    // If tonnage provided and price_per_tonne present, treat as Metals
+    if (modalTonnage > 0 && modalPPT > 0) {
+        const metalsPrice = Math.round(modalTonnage * modalPPT);
+        // For metals, also compute implied volume using server tonne->m3
+        const vol = modalTonnage * _tonneToM3_from_config;
+        document.getElementById('modal_volume').value = vol.toFixed(2);
+        document.getElementById('modal_price').value = metalsPrice;
+        return;
+    }
+
+    // If modal has car volumes, compute volume and use proportional pricing
+    if ((modalVolumeVide > 0) || (modalVolumeUsed > 0 && modalVolumeVide > 0)) {
+        const clientVol = Math.max(modalVolumeVide - modalVolumeUsed, 0);
+        document.getElementById('modal_volume').value = clientVol.toFixed(2);
+        const result = calculateClientPrice(_containerPrice_from_config, _containerVolume_from_config, clientVol, extraCharge);
+        document.getElementById('modal_price').value = result.basePrice;
+        return;
+    }
+
+    // Default: merchandise or explicit volume
+    const clientVolume = modalVolume;
+    const result = calculateClientPrice(_containerPrice_from_config, _containerVolume_from_config, clientVolume, extraCharge);
+    document.getElementById('modal_price').value = result.basePrice;
+}
+
+// Helpers to wire modal inputs
+document.getElementById('modal_volume').addEventListener('change', calculateModalPrice);
+document.getElementById('modal_volume_vide').addEventListener('change', calculateModalPrice);
+document.getElementById('modal_volume_used').addEventListener('change', calculateModalPrice);
+document.getElementById('modal_tonnage').addEventListener('change', calculateModalPrice);
+document.getElementById('modal_price_per_tonne').addEventListener('change', calculateModalPrice);
+document.getElementById('modal_extra_charge').addEventListener('change', calculateModalPrice);
 </script>
 {% endblock %}

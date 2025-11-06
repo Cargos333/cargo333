@@ -49,7 +49,7 @@
                         <input type="file" class="form-control" id="excel_file" name="file" 
                                accept=".xlsx" required>
                         <small class="form-text text-muted">
-                            Excel file should have columns: Reference, Quantity, Length, Width, Height
+                            Excel file should have columns: Reference, Quantity, Length (m), Width (m), Height (m), Goods Type, Volume Used
                         </small>
                     </div>
                     <div class="col-md-4">
@@ -64,22 +64,44 @@
                         <label for="reference" class="form-label">Item Reference</label>
                         <input type="text" class="form-control" id="reference" name="reference" required>
                     </div>
-                    <div class="col-md-2 mb-3">
+                    <div class="col-md-2 mb-3 goods-dim">
                         <label for="quantity" class="form-label">Quantity</label>
                         <input type="number" class="form-control" id="quantity" name="quantity" required min="1">
                     </div>
-                    <div class="col-md-2 mb-3">
+                    <div class="col-md-2 mb-3 goods-dim">
                         <label for="length" class="form-label">Length (m)</label>
                         <input type="number" step="0.01" class="form-control" id="length" name="length" required>
                     </div>
-                    <div class="col-md-2 mb-3">
+                    <div class="col-md-2 mb-3 goods-dim">
                         <label for="width" class="form-label">Width (m)</label>
                         <input type="number" step="0.01" class="form-control" id="width" name="width" required>
                     </div>
-                    <div class="col-md-2 mb-3">
+                    <div class="col-md-2 mb-3 goods-dim">
                         <label for="height" class="form-label">Height (m)</label>
                         <input type="number" step="0.01" class="form-control" id="height" name="height" required>
                     </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="goods_type" class="form-label">Goods Type</label>
+                        <select class="form-select" id="goods_type" name="goods_type" onchange="onAddGoodsTypeChange()">
+                            <option value="Merchandise">Merchandise</option>
+                            <option value="Car">Car</option>
+                            <option value="Metals">Metals</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3 goods-extra goods-car d-none">
+                        <label class="form-label">Volume Vide (m³)</label>
+                        <!-- readonly so user cannot edit; value computed from L*W*H*Qty -->
+                        <input type="number" step="0.01" class="form-control" name="volume_vide" id="add_volume_vide" readonly>
+                    </div>
+                    <div class="col-md-3 mb-3 goods-extra goods-car d-none">
+                        <label class="form-label">Volume Used (m³)</label>
+                        <input type="number" step="0.01" class="form-control" name="volume_used" id="add_volume_used">
+                    </div>
+                    <div class="col-md-3 mb-3 goods-extra goods-metals d-none">
+                        <label class="form-label">Tonnage (t)</label>
+                        <input type="number" step="0.01" class="form-control" name="tonnage" id="add_tonnage">
+                    </div>
+                    <!-- Price per tonne is intentionally hidden for Products (we only capture tonnage) -->
                 </div>
                 <button type="submit" class="btn btn-primary">Add Product</button>
             </form>
@@ -109,12 +131,15 @@
                                 <input type="checkbox" id="select-all-checkbox" onchange="selectAllCheckboxes(this.checked)">
                             </th>
                             {% endif %}
-                            <th>Reference</th>
-                            <th>Quantity</th>  <!-- This is the second column we want to show in print -->
+                            <th class="col-reference">Reference</th>
+                            <th class="col-quantity">Quantity</th>  <!-- This is the second column we want to show in print -->
                             <th>Length (m)</th>
                             <th>Width (m)</th>
                             <th>Height (m)</th>
-                            <th>Volume (m³)</th>  <!-- This is the sixth column we want to show in print -->
+                            <th class="col-goods-type">Goods Type</th>
+                            <th class="col-volume-vide">Volume Vide (m³)</th>
+                            <th class="col-volume-used">Volume Used (m³)</th>
+                            <th class="col-volume">Volume (m³)</th>  <!-- This is the tenth column we want to show in print -->
                             {% if not container_delivered %}
                             <th>Actions</th>
                             {% endif %}
@@ -128,33 +153,76 @@
                                 <input type="checkbox" class="product-select" data-id="{{ product.id }}" onchange="updateDeleteButton()">
                             </td>
                             {% endif %}
-                            <td>
+                            <td class="col-reference">
                                 <span class="view-mode">{{ product.reference }}</span>
                                 <input type="text" class="form-control edit-mode d-none" value="{{ product.reference }}" name="reference">
                             </td>
-                            <td>
-                                <span class="view-mode">{{ product.quantity }}</span>
-                                <input type="number" class="form-control edit-mode d-none" value="{{ product.quantity }}" name="quantity" min="1">
+                            <td class="col-quantity">
+                                <span class="view-mode">
+                                    {% if product.goods_type == 'Metals' %}
+                                        {{ product.quantity|int }}
+                                    {% else %}
+                                        {{ product.quantity }}
+                                    {% endif %}
+                                </span>
+                                <!-- In edit mode, for Metals show tonnage (decimal) input; for others show quantity (integer) -->
+                                {% if product.goods_type == 'Metals' %}
+                                <input type="number" step="0.01" class="form-control edit-mode d-none" value="{{ product.tonnage or '' }}" name="tonnage" min="0">
+                                {% else %}
+                                <input type="number" step="1" class="form-control edit-mode d-none" value="{{ product.quantity }}" name="quantity" min="0">
+                                {% endif %}
                             </td>
                             <td>
-                                <span class="view-mode">{{ product.length }}</span>
+                                <span class="view-mode">{% if product.goods_type == 'Metals' %}&nbsp;{% else %}{{ product.length }}{% endif %}</span>
                                 <input type="number" step="0.01" class="form-control edit-mode d-none" value="{{ product.length }}" name="length">
                             </td>
                             <td>
-                                <span class="view-mode">{{ product.width }}</span>
+                                <span class="view-mode">{% if product.goods_type == 'Metals' %}&nbsp;{% else %}{{ product.width }}{% endif %}</span>
                                 <input type="number" step="0.01" class="form-control edit-mode d-none" value="{{ product.width }}" name="width">
                             </td>
                             <td>
-                                <span class="view-mode">{{ product.height }}</span>
+                                <span class="view-mode">{% if product.goods_type == 'Metals' %}&nbsp;{% else %}{{ product.height }}{% endif %}</span>
                                 <input type="number" step="0.01" class="form-control edit-mode d-none" value="{{ product.height }}" name="height">
                             </td>
-                            <td>{{ "%.2f"|format(product.volume) }}</td>
+                            <td class="col-goods-type">
+                                <span class="view-mode">{{ product.goods_type or 'Merchandise' }}</span>
+                                <!-- Goods type is immutable once created; show readonly value in edit mode and do not submit it -->
+                                <input type="text" class="form-control edit-mode d-none" value="{{ product.goods_type or 'Merchandise' }}" readonly>
+                            </td>
+                            <td class="col-volume-vide">
+                                <span class="view-mode">{% if product.goods_type == 'Metals' %}&nbsp;{% else %}{% if product.volume_vide %}{{ "%.2f"|format(product.volume_vide) }}{% else %}&nbsp;{% endif %}{% endif %}</span>
+                                <!-- Volume Vide is readonly when editing (computed) -->
+                                <input type="number" step="0.01" class="form-control edit-mode d-none" name="volume_vide" value="{{ product.volume_vide or '' }}" readonly>
+                            </td>
+                            <td class="col-volume-used">
+                                <span class="view-mode">{% if product.goods_type == 'Metals' %}&nbsp;{% else %}{% if product.volume_used %}{{ "%.2f"|format(product.volume_used) }}{% else %}&nbsp;{% endif %}{% endif %}</span>
+                                <input type="number" step="0.01" class="form-control edit-mode d-none" name="volume_used" value="{{ product.volume_used or '' }}">
+                            </td>
+                            <td class="col-volume">
+                                <div class="view-mode">
+                                    {% if product.goods_type == 'Metals' %}
+                                        {{ "%.2f"|format(0.0) }}
+                                    {% else %}
+                                        {% if product.volume and product.volume > 0 %}
+                                            {{ "%.2f"|format(product.volume) }}
+                                        {% else %}
+                                            &nbsp;
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="edit-mode d-none">
+                                    <!-- Volume is computed and cannot be edited; show readonly value -->
+                                    <input type="text" class="form-control" name="volume_display" value="{{ "%.2f"|format(product.volume) }}" readonly>
+                                    <!-- Allow editing tonnage for Metals in edit-mode -->
+                                    <input type="number" step="0.01" class="form-control mt-1" name="tonnage" placeholder="Tonnage (t)" value="{{ product.tonnage or '' }}">
+                                </div>
+                            </td>
                             {% if not container_delivered %}
                             <td>
                                 <div class="btn-group">
-                                    <button type="button" class="btn btn-primary btn-sm view-mode" onclick="toggleEdit({{ product.id }})">Edit</button>
-                                    <button type="button" class="btn btn-success btn-sm edit-mode d-none" onclick="saveProduct({{ product.id }})">Save</button>
-                                    <button type="button" class="btn btn-secondary btn-sm edit-mode d-none" onclick="toggleEdit({{ product.id }})">Cancel</button>
+                                    <button type="button" class="btn btn-primary btn-sm view-mode btn-edit" data-product-id="{{ product.id }}">Edit</button>
+                                    <button type="button" class="btn btn-success btn-sm edit-mode d-none btn-save" data-product-id="{{ product.id }}">Save</button>
+                                    <button type="button" class="btn btn-secondary btn-sm edit-mode d-none btn-cancel" data-product-id="{{ product.id }}">Cancel</button>
                                     <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" class="d-inline" 
                                           onsubmit="return confirm('Are you sure you want to delete this product?');">
                                         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
@@ -167,8 +235,11 @@
                     </tbody>
                     <tfoot>
                         <tr class="table-secondary">
-                            <td {% if not container_delivered %}colspan="6"{% else %}colspan="5"{% endif %} class="print-colspan"><strong>Total Volume</strong></td>
-                            <td><strong>{{ "%.2f"|format(products|sum(attribute='volume')) }} m³</strong></td>
+                            {# For on-screen layout, span all columns up to (but not including) the Volume column
+                               When the checkbox and Actions columns are present (not container_delivered),
+                               the Volume column is the 10th column so span should be 9. Otherwise span 8. #}
+                            <td {% if not container_delivered %}colspan="9"{% else %}colspan="8"{% endif %} class="print-colspan"><strong>Total Volume</strong></td>
+                            <td class="col-volume"><strong>{{ "%.2f"|format(products|sum(attribute='volume')) }} m³</strong></td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -216,26 +287,46 @@
         display: none !important;
     }
     
-    /* Then explicitly show ONLY the three columns we want */
-    /* Reference column (first visible) */
-    table tbody tr td:nth-of-type({% if not container_delivered %}2{% else %}1{% endif %}),
-    table thead tr th:nth-of-type({% if not container_delivered %}2{% else %}1{% endif %}) {
+    /* Then explicitly show ONLY the three columns we want by class (avoids fragile nth-child indices) */
+    /* Reference column */
+    table thead th.col-reference,
+    table tbody td.col-reference {
         display: table-cell !important;
-        width: 45% !important;
+        width: 30% !important;
     }
-    
-    /* Quantity column (second visible) */
-    table tbody tr td:nth-of-type({% if not container_delivered %}3{% else %}2{% endif %}),
-    table thead tr th:nth-of-type({% if not container_delivered %}3{% else %}2{% endif %}) {
+
+    /* Quantity column */
+    table thead th.col-quantity,
+    table tbody td.col-quantity {
         display: table-cell !important;
-        width: 20% !important;
+        width: 10% !important;
     }
-    
-    /* Volume column (third visible) */
-    table tbody tr td:nth-of-type({% if not container_delivered %}7{% else %}6{% endif %}),
-    table thead tr th:nth-of-type({% if not container_delivered %}7{% else %}6{% endif %}) {
+
+    /* Volume column */
+    table thead th.col-volume,
+    table tbody td.col-volume,
+    table tfoot td.col-volume {
         display: table-cell !important;
-        width: 35% !important;
+        width: 25% !important;
+    }
+
+    /* Show Goods Type, Volume Vide and Volume Used for print */
+    table thead th.col-goods-type,
+    table tbody td.col-goods-type {
+        display: table-cell !important;
+        width: 15% !important;
+    }
+
+    table thead th.col-volume-vide,
+    table tbody td.col-volume-vide {
+        display: table-cell !important;
+        width: 10% !important;
+    }
+
+    table thead th.col-volume-used,
+    table tbody td.col-volume-used {
+        display: table-cell !important;
+        width: 10% !important;
     }
     
     /* Hide checkbox column with !important */
@@ -261,20 +352,19 @@
         display: table-cell !important;
         text-align: right !important;
         width: 65% !important;
-        colspan: 2 !important;
     }
     
-    /* Make sure only Reference, Quantity and Volume columns remain visible */
-    th:nth-child(1), td:nth-child(1),    /* Reference column */
-    th:nth-child(2), td:nth-child(2),    /* Quantity column */ 
-    th:nth-child(6), td:nth-child(6) {   /* Volume column */
+    /* Ensure the key columns remain visible (class-based) */
+    table thead th.col-reference, table tbody td.col-reference,
+    table thead th.col-quantity, table tbody td.col-quantity,
+    table thead th.col-goods-type, table tbody td.col-goods-type,
+    table thead th.col-volume-vide, table tbody td.col-volume-vide,
+    table thead th.col-volume-used, table tbody td.col-volume-used,
+    table thead th.col-volume, table tbody td.col-volume, table tfoot td.col-volume {
         display: table-cell !important;
     }
-    
-    /* Properly adjust the column widths for print */
-    th:nth-child(1), td:nth-child(1) { width: 45% !important; }  /* Reference */
-    th:nth-child(2), td:nth-child(2) { width: 20% !important; }  /* Quantity */
-    th:nth-child(6), td:nth-child(6) { width: 35% !important; }  /* Volume */
+
+    /* Column widths are already set above; this is kept for compatibility */
     
     /* Override any fixed positioning that might affect printing */
     .fixed-top, .sticky-top, .fixed-bottom {
@@ -302,10 +392,7 @@
         padding: 20px !important;
     }
     
-    /* Fix the footer colspan for print layout */
-    tfoot tr td:first-child {
-        colspan: 2 !important;
-    }
+    /* Fix the footer colspan for print layout: handled in JS when printing */
     
     /* Adjust table layout when columns are hidden */
     table {
@@ -337,8 +424,9 @@ function saveProduct(productId) {
     const row = document.getElementById(`row-${productId}`);
     const formData = new FormData();
     
-    row.querySelectorAll('input').forEach(input => {
-        formData.append(input.name, input.value);
+    // Include inputs and selects inside the row (edit-mode fields)
+    row.querySelectorAll('input, select, textarea').forEach(el => {
+        if (el.name) formData.append(el.name, el.value);
     });
     
     fetch(`/product/${productId}/edit`, {
@@ -353,6 +441,149 @@ function saveProduct(productId) {
     });
 }
 
+function onAddGoodsTypeChange() {
+    const val = document.getElementById('goods_type').value;
+    document.querySelectorAll('.goods-extra').forEach(el => el.classList.add('d-none'));
+    // Show/hide dimension fields: hide when Metals selected
+    document.querySelectorAll('.goods-dim').forEach(el => {
+        const inputs = el.querySelectorAll('input, select, textarea');
+        if (val === 'Metals') {
+            el.classList.add('d-none');
+            // disable inputs so browser validation won't block submit
+            inputs.forEach(i => i.setAttribute('disabled', 'disabled'));
+        } else {
+            el.classList.remove('d-none');
+            inputs.forEach(i => i.removeAttribute('disabled'));
+        }
+    });
+
+    if (val === 'Car') {
+        document.querySelectorAll('.goods-car').forEach(el => el.classList.remove('d-none'));
+    } else if (val === 'Metals') {
+        document.querySelectorAll('.goods-metals').forEach(el => el.classList.remove('d-none'));
+    }
+}
+
+// Compute the Add form's Volume Vide = length * width * height * quantity
+function computeAddVolumeVide() {
+    const goodsTypeEl = document.getElementById('goods_type');
+    if (!goodsTypeEl) return;
+    if (goodsTypeEl.value !== 'Car') {
+        // clear value when not Car
+        const vEl = document.getElementById('add_volume_vide');
+        if (vEl) vEl.value = '';
+        return;
+    }
+
+    const qty = parseFloat(document.getElementById('quantity').value || 0) || 0;
+    const len = parseFloat(document.getElementById('length').value || 0) || 0;
+    const wid = parseFloat(document.getElementById('width').value || 0) || 0;
+    const hei = parseFloat(document.getElementById('height').value || 0) || 0;
+
+    const vol = (len * wid * hei * qty) || 0;
+    const vEl = document.getElementById('add_volume_vide');
+    if (vEl) {
+        // keep two decimals
+        vEl.value = vol ? vol.toFixed(2) : '';
+    }
+}
+
+// Attach listeners so volume_vide updates when dimensions or qty change
+document.addEventListener('DOMContentLoaded', () => {
+    ['quantity', 'length', 'width', 'height', 'goods_type'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', computeAddVolumeVide);
+        el.addEventListener('change', computeAddVolumeVide);
+    });
+    // Run once on load to initialize
+    onAddGoodsTypeChange();
+    computeAddVolumeVide();
+});
+
+// Recompute Car row volume live when editing a product row
+function recomputeRowVolume(row) {
+    if (!row) return;
+    // Determine goods type from the readonly edit-mode input or view-mode text
+    const goodsInput = row.querySelector('.col-goods-type .edit-mode input') || row.querySelector('.col-goods-type .view-mode');
+    let goodsType = '';
+    if (goodsInput) {
+        if (goodsInput.tagName === 'INPUT') goodsType = goodsInput.value || '';
+        else goodsType = goodsInput.textContent || '';
+    }
+    goodsType = (goodsType || '').trim();
+
+    if (goodsType !== 'Car') return; // only care about Car rows here
+
+    const volVideEl = row.querySelector('input[name="volume_vide"]');
+    const volUsedEl = row.querySelector('input[name="volume_used"]');
+    const qtyEl = row.querySelector('input[name="quantity"]');
+    const lenEl = row.querySelector('input[name="length"]');
+    const widEl = row.querySelector('input[name="width"]');
+    const heiEl = row.querySelector('input[name="height"]');
+    const volumeDisplay = row.querySelector('input[name="volume_display"]');
+
+    let volVide = parseFloat(volVideEl?.value || 0) || 0;
+    let volUsed = parseFloat(volUsedEl?.value || 0) || 0;
+
+    // If volume_vide is not provided, try compute from dimensions
+    if ((!volVide || volVide === 0) && lenEl && widEl && heiEl && qtyEl) {
+        const qty = parseFloat(qtyEl.value || 0) || 0;
+        const len = parseFloat(lenEl.value || 0) || 0;
+        const wid = parseFloat(widEl.value || 0) || 0;
+        const hei = parseFloat(heiEl.value || 0) || 0;
+        volVide = len * wid * hei * qty;
+    }
+
+    // Write computed Volume Vide back into the volume_vide input so it's submitted on save
+    if (volVideEl) {
+        volVideEl.value = volVide ? volVide.toFixed(2) : '';
+    }
+
+    const newVol = Math.max(volVide - volUsed, 0);
+    if (volumeDisplay) {
+        // Keep two decimals and show blank if zero
+        volumeDisplay.value = newVol ? newVol.toFixed(2) : '';
+    }
+}
+
+// Delegated listener: update Car row volume when relevant inputs change
+document.addEventListener('input', (e) => {
+    const target = e.target;
+    if (!target) return;
+    const relevantNames = ['volume_used','volume_vide','quantity','length','width','height'];
+    if (target.name && relevantNames.includes(target.name)) {
+        const row = target.closest('tr');
+        recomputeRowVolume(row);
+    }
+});
+
+// Delegated click handler for row action buttons (Edit / Save / Cancel)
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.btn-edit, .btn-save, .btn-cancel');
+    if (!btn) return;
+    const id = btn.dataset.productId;
+    if (!id) return;
+
+    if (btn.classList.contains('btn-edit')) {
+        // toggle into edit mode
+        toggleEdit(id);
+        return;
+    }
+
+    if (btn.classList.contains('btn-save')) {
+        // save product via existing function
+        saveProduct(id);
+        return;
+    }
+
+    if (btn.classList.contains('btn-cancel')) {
+        // cancel == toggle back to view
+        toggleEdit(id);
+        return;
+    }
+});
+
 function printProducts() {
     // Adjust footer colspan for printing
     const footerCell = document.querySelector('tfoot tr td:first-child');
@@ -361,8 +592,8 @@ function printProducts() {
     // Store original value to restore after printing
     footerCell.dataset.originalColspan = originalColspan;
     
-    // Set to 2 for printing (accounting for the hidden columns)
-    footerCell.setAttribute('colspan', '2');
+    // Set to 5 for printing to align Total under the Volume column (Reference, Quantity, Goods Type, Volume Vide, Volume Used => 5 cols before Volume)
+    footerCell.setAttribute('colspan', '5');
     
     window.print();
     

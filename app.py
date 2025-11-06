@@ -476,10 +476,23 @@ def delete_shipment(id):
     container_id = shipment.container_id
     try:
         client = shipment.client
+        
+        # Check if client should be deleted BEFORE deleting the shipment
+        # (count shipments before this one is removed from the relationship)
+        should_delete_client = False
+        if client:
+            # Count how many shipments this client has (excluding the one we're about to delete)
+            other_shipments_count = Shipment.query.filter(
+                Shipment.client_id == client.id,
+                Shipment.id != shipment.id
+            ).count()
+            should_delete_client = (other_shipments_count == 0)
+        
+        # Now delete the shipment
         db.session.delete(shipment)
         
         # Delete client if they have no other shipments
-        if len(client.shipments) <= 1:
+        if should_delete_client:
             db.session.delete(client)
         
         db.session.commit()

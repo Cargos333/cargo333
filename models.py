@@ -30,6 +30,12 @@ class Shipment(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     container_id = db.Column(db.Integer, db.ForeignKey('container.id'), nullable=False)
     volume = db.Column(db.Float, nullable=False)
+    # Tonnage and price per tonne for metal shipments (nullable for other goods types)
+    tonnage = db.Column(db.Float, nullable=True)
+    price_per_tonne = db.Column(db.Float, nullable=True)
+    # For cars: store the empty volume (vide) and the used volume so we can display them
+    volume_vide = db.Column(db.Float, nullable=True)
+    volume_used = db.Column(db.Float, nullable=True)
     price = db.Column(db.Float, nullable=False)
     payment_status = db.Column(db.String(20), default='unpaid')  # paid, unpaid, partial
     paid_amount = db.Column(db.Float, default=0.0)
@@ -41,6 +47,12 @@ class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     reference = db.Column(db.String(100), nullable=False)
+    # Goods-style fields to mirror Shipment behavior (nullable for legacy rows)
+    goods_type = db.Column(db.String(50), nullable=True)  # 'Merchandise', 'Car', 'Metals'
+    tonnage = db.Column(db.Float, nullable=True)
+    price_per_tonne = db.Column(db.Float, nullable=True)
+    volume_vide = db.Column(db.Float, nullable=True)
+    volume_used = db.Column(db.Float, nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     length = db.Column(db.Float, nullable=False)
     width = db.Column(db.Float, nullable=False)

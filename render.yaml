@@ -7,3 +7,10 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: # Use an ephemeral SQLite database on Render's ephemeral filesystem so the DB is NOT persisted between deploys
+        name: DATABASE_URL
+        value: "postgresql://cargo_db_ofg3_user:OlxdBEGckM3DnLYLePaZunBnhmrEdKpa@dpg-cvt0ed24d50c73db1n8g-a.oregon-postgres.render.com/cargo_db_ofg3"
+      - key: SECRET_KEY
+        value: "a7153e2ffe196b572ee474300a7fd13b"
+    # Optional: health check path so Render knows the service is healthy
+    healthCheckPath: /

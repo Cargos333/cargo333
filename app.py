@@ -13,6 +13,27 @@ import os
 # Add these constants at the top of the file
 CONTAINER_TYPES = ['40ft', '20ft']
 DESTINATIONS = ['Moroni', 'Mutsamudu']
+# Conversion factor from tonne to cubic meters (adjustable via env: TONNE_TO_M3)
+TONNE_TO_M3 = float(os.getenv('TONNE_TO_M3', '1'))
+# Per-container defaults (can be overridden via env variables)
+# Example: TONNE_TO_M3_20FT=1.1 TONNE_TO_M3_40FT=1.3
+TONNE_TO_M3_20FT = float(os.getenv('TONNE_TO_M3_20FT', os.getenv('TONNE_TO_M3_20FT', '1')))
+TONNE_TO_M3_40FT = float(os.getenv('TONNE_TO_M3_40FT', os.getenv('TONNE_TO_M3_40FT', '1')))
+
+def get_tonne_to_m3_for_container(container_type: str) -> float:
+    """Return conversion factor tonne -> m3 based on container type.
+
+    Defaults fall back to TONNE_TO_M3, but can be overridden by
+    TONNE_TO_M3_20FT / TONNE_TO_M3_40FT environment variables.
+    """
+    if not container_type:
+        return TONNE_TO_M3
+    ct = container_type.lower()
+    if '20' in ct:
+        return TONNE_TO_M3_20FT or TONNE_TO_M3
+    if '40' in ct:
+        return TONNE_TO_M3_40FT or TONNE_TO_M3
+    return TONNE_TO_M3
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -56,9 +77,22 @@ def add_container():
 @app.route('/history')
 @login_required
 def history():
-    # Change ordering to descending by ID
-    delivered_containers = Container.query.filter_by(status='delivered').order_by(Container.id.desc()).all()
-    return render_template('history.html', containers=delivered_containers)
+    # Support optional search by container number or container name
+    search_query = request.args.get('search', '').strip()
+
+    # Base query for delivered containers
+    base_q = Container.query.filter_by(status='delivered')
+
+    if search_query:
+        # Case-insensitive search on container_number or container_name
+        base_q = base_q.filter(db.or_(
+            Container.container_number.ilike(f"%{search_query}%"),
+            Container.container_name.ilike(f"%{search_query}%")
+        ))
+
+    # Order by descending ID for recent-first display
+    delivered_containers = base_q.order_by(Container.id.desc()).all()
+    return render_template('history.html', containers=delivered_containers, search_query=search_query)
 
 @app.route('/')
 @login_required
@@ -96,7 +130,9 @@ def container_details(id):
     # Replace container.shipments with our ordered shipments for the template
     container.shipments = shipments
     
-    return render_template('container_details.html', container=container)
+    # Provide container-specific tonne->m3 conversion to the template
+    container_tonne_to_m3 = get_tonne_to_m3_for_container(container.container_type)
+    return render_template('container_details.html', container=container, TONNE_TO_M3=TONNE_TO_M3, container_tonne_to_m3=container_tonne_to_m3)
 
 @app.route('/container/create', methods=['POST'])
 @login_required
@@ -152,6 +188,8 @@ def add_client_to_container(id):
         name = request.form.get('client_name', '').strip()
         mark = request.form.get('client_mark', '').strip()
         phone = request.form.get('client_phone', '').strip()
+        # Goods type: 'Merchandise', 'Car', 'Metals'
+        goods_type = request.form.get('goods_type', 'Merchandise')
         
         # Check for outstanding payments before adding client
         clients_with_same_mark = Client.query.filter(Client.mark.ilike(mark)).all()
@@ -171,16 +209,39 @@ def add_client_to_container(id):
             if outstanding_payments:
                 app.logger.info(f"Client mark {mark} has {len(outstanding_payments)} outstanding payments but proceeding with adding to container")
         
-        # Validate numeric inputs
-        volume = request.form.get('volume', '')
-        extra_charge = float(request.form.get('extra_charge', 0))
-        
-        # Convert to float with validation
+        # Validate numeric inputs depending on goods type
+        extra_charge = float(request.form.get('extra_charge', 0) or 0)
+
+        # Compute volume and price according to goods type
         try:
-            volume = float(volume) if volume else 0.0
-            price, total_price = calculate_client_price(container.price, container.total_volume, volume, extra_charge)
+            if goods_type == 'Merchandise':
+                # Use the normal volume-based flow
+                volume = float(request.form.get('volume', '') or 0)
+                price, total_price = calculate_client_price(container.price, container.total_volume, volume, extra_charge)
+
+            elif goods_type == 'Car':
+                # For cars user provides empty volume (vide) and used volume; actual volume = vide - used
+                volume_vide = float(request.form.get('volume_vide', '') or 0)
+                volume_used = float(request.form.get('volume_used', '') or 0)
+                volume = max(volume_vide - volume_used, 0)
+                price, total_price = calculate_client_price(container.price, container.total_volume, volume, extra_charge)
+
+            elif goods_type == 'Metals':
+                # Metals are priced per tonne; we ask for tonnage and price per tonne
+                tonnage = float(request.form.get('tonnage', '') or 0)
+                price_per_tonne = float(request.form.get('price_per_tonne', '') or 0)
+                # Convert tonne to volume for bookkeeping using container-specific conversion
+                tonne_to_m3 = get_tonne_to_m3_for_container(container.container_type)
+                volume = tonnage * tonne_to_m3
+                # Use price per tonne * tonnage for base price instead of container proportion
+                price = round(price_per_tonne * tonnage)
+                total_price = round(price + extra_charge)
+            else:
+                # Fallback to merchandise behavior
+                volume = float(request.form.get('volume', '') or 0)
+                price, total_price = calculate_client_price(container.price, container.total_volume, volume, extra_charge)
         except ValueError:
-            return "Please enter valid numbers for volume and extra charge", 400
+            return "Please enter valid numeric values for the selected goods type and charges", 400
         
         payment_status = request.form.get('payment_status', 'unpaid')
         paid_amount = request.form.get('paid_amount', '0')
@@ -199,7 +260,8 @@ def add_client_to_container(id):
         db.session.add(client)
         
         # Create shipment with payment info
-        shipment = Shipment(
+        # Include tonnage and price_per_tonne for Metals shipments
+        shipment_kwargs = dict(
             client=client,
             container=container,
             volume=volume,
@@ -208,6 +270,17 @@ def add_client_to_container(id):
             payment_status=payment_status,
             paid_amount=paid_amount if payment_status == 'partial' else (price + extra_charge if payment_status == 'paid' else 0)
         )
+
+        if goods_type == 'Metals':
+            # Ensure variables exist in this scope (they were computed above)
+            shipment_kwargs['tonnage'] = tonnage
+            shipment_kwargs['price_per_tonne'] = price_per_tonne
+        elif goods_type == 'Car':
+            # Persist the car-specific inputs so we can show them in the table
+            shipment_kwargs['volume_vide'] = volume_vide
+            shipment_kwargs['volume_used'] = volume_used
+
+        shipment = Shipment(**shipment_kwargs)
         
         db.session.add(shipment)
         db.session.commit()
@@ -276,15 +349,19 @@ def edit_container(id):
         container.total_volume = float(request.form.get('total_volume'))
         container.price = float(request.form.get('price'))
         container.destination = request.form.get('destination')
+        # Optional: allow setting priority flag from edit form
+        sur_et_start_val = request.form.get('sur_et_start')
+        # The checkbox will be present as 'on' when checked in most browsers
+        container.sur_et_start = bool(sur_et_start_val) and sur_et_start_val not in ('false', '0', '')
         
         db.session.commit()
         flash('Container updated successfully')
-        
     except Exception as e:
         db.session.rollback()
         flash(f'Error updating container: {str(e)}')
-    
-    return redirect(url_for('dashboard'))
+
+    # After editing, return to the container details page so the user remains in context
+    return redirect(url_for('container_details', id=id))
 
 @app.route('/shipment/<int:id>/update_payment', methods=['POST'])
 @login_required
@@ -307,21 +384,76 @@ def edit_shipment(id):
         client = shipment.client
         container = shipment.container
         
-        # Update client info
-        client.name = request.form.get('client_name')
-        client.mark = request.form.get('client_mark')
-        client.phone = request.form.get('client_phone')
+        # Do NOT allow editing client mark or name from this modal; only allow phone updates.
+        # Ignore any posted client_name/client_mark to enforce immutability server-side.
+        posted_client_phone = request.form.get('client_phone')
+        if posted_client_phone is not None:
+            client.phone = posted_client_phone
         
         # Update shipment info
-        new_volume = float(request.form.get('volume'))
+        # Support Metals edits: prefer tonnage/price_per_tonne when provided
         extra_charge = float(request.form.get('extra_charge', 0))
-        
-        # Use the common price calculation function
-        base_price, _ = calculate_client_price(container.price, container.total_volume, new_volume)
-        
-        shipment.volume = new_volume
-        shipment.price = base_price  # Use calculated base price
-        shipment.extra_charge = extra_charge
+
+        # Try to read tonnage/price_per_tonne from form (may be absent)
+        tonnage_form = request.form.get('tonnage')
+        price_per_tonne_form = request.form.get('price_per_tonne')
+    # Do NOT allow an explicit price override from the modal form. Any 'price' field
+    # submitted by the client will be ignored to prevent tampering. Price is computed
+    # server-side from tonnage/price_per_tonne or from calculated base price.
+
+        # If tonnage provided -> Metals edit
+        if tonnage_form is not None and price_per_tonne_form is not None and tonnage_form != '':
+            try:
+                tonnage_val = float(tonnage_form)
+                ppt_val = float(price_per_tonne_form) if price_per_tonne_form != '' else 0
+            except ValueError:
+                return "Please enter valid numeric values for tonnage/price per tonne", 400
+
+            # Convert tonne to volume using container-specific factor
+            tonne_to_m3 = get_tonne_to_m3_for_container(container.container_type)
+            new_volume = tonnage_val * tonne_to_m3
+            new_price = round(tonnage_val * ppt_val)
+
+            shipment.tonnage = tonnage_val
+            shipment.price_per_tonne = ppt_val
+            shipment.volume = new_volume
+            shipment.price = new_price
+            shipment.extra_charge = extra_charge
+        else:
+            # Check for Car fields (volume_vide/volume_used)
+            volume_vide_form = request.form.get('volume_vide')
+            volume_used_form = request.form.get('volume_used')
+
+            if volume_vide_form is not None and volume_vide_form != '':
+                try:
+                    vide_val = float(volume_vide_form)
+                    used_val = float(volume_used_form) if volume_used_form not in (None, '') else 0
+                except ValueError:
+                    return "Please enter valid numeric values for vide/used volumes", 400
+
+                new_volume = max(vide_val - used_val, 0)
+                base_price, _ = calculate_client_price(container.price, container.total_volume, new_volume)
+
+                shipment.volume_vide = vide_val
+                shipment.volume_used = used_val
+                shipment.volume = new_volume
+                # Always use the calculated base price; ignore any manual price override.
+                shipment.price = base_price
+                shipment.extra_charge = extra_charge
+            else:
+                # Non-metals / legacy flow — update by volume
+                try:
+                    new_volume = float(request.form.get('volume'))
+                except (TypeError, ValueError):
+                    return "Please enter a valid numeric volume", 400
+
+                # Use the common price calculation function
+                base_price, _ = calculate_client_price(container.price, container.total_volume, new_volume)
+
+                shipment.volume = new_volume
+                # Always use the calculated base price; ignore any manual price override.
+                shipment.price = base_price  # Use calculated base price
+                shipment.extra_charge = extra_charge
         
         # Update payment info
         payment_status = request.form.get('payment_status')
@@ -466,6 +598,33 @@ def employees():
     employees = User.query.all()
     return render_template('employees.html', employees=employees)
 
+
+@app.route('/employee/<int:id>/update_role', methods=['POST'])
+@login_required
+@admin_required
+def update_employee_role(id):
+    try:
+        employee = User.query.get_or_404(id)
+
+        # Prevent changing your own role via this route
+        if current_user.id == employee.id:
+            flash('You cannot change your own role from this page', 'warning')
+            return redirect(url_for('employees'))
+
+        new_role = request.form.get('role')
+        if new_role not in ('Admin', 'Secretary', 'Manager', 'Employee'):
+            flash('Invalid role selected', 'danger')
+            return redirect(url_for('employees'))
+
+        employee.role = new_role
+        db.session.commit()
+        flash(f'Role updated for {employee.username} to {new_role}', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating role: {str(e)}', 'danger')
+
+    return redirect(url_for('employees'))
+
 @app.route('/employee/add', methods=['POST'])
 @login_required
 def add_employee():
@@ -551,26 +710,96 @@ def client_products(id):
 def add_product(id):
     try:
         client = Client.query.get_or_404(id)
-        
         reference = request.form.get('reference')
-        quantity = int(request.form.get('quantity'))
-        length = float(request.form.get('length'))
-        width = float(request.form.get('width'))
-        height = float(request.form.get('height'))
-        
-        product = Product(
-            client_id=id,
-            reference=reference,
-            quantity=quantity,
-            length=length,
-            width=width,
-            height=height,
-            volume=length * width * height * quantity
-        )
-        
+
+        # New: support goods_type for products (Merchandise/Car/Metals)
+        goods_type = request.form.get('goods_type', 'Merchandise')
+
+        # For Metals, dimensions and quantity are not required. Parse fields depending on goods type.
+        if goods_type == 'Metals':
+            # Use safe defaults for dimensions/quantity for metals
+            quantity = int(request.form.get('quantity') or 1)
+            length = float(request.form.get('length') or 0)
+            width = float(request.form.get('width') or 0)
+            height = float(request.form.get('height') or 0)
+            # We'll compute volume from tonnage below
+            volume = 0
+
+        else:
+            # For Merchandise and Car, dimensions and quantity are required (validate)
+            try:
+                quantity = int(request.form.get('quantity'))
+                length = float(request.form.get('length'))
+                width = float(request.form.get('width'))
+                height = float(request.form.get('height'))
+            except (TypeError, ValueError):
+                return "Please enter valid numeric values for quantity and dimensions", 400
+
+            # Default computed volume (merchandise)
+            volume = length * width * height * quantity
+
+        # Handle special goods types
+        if goods_type == 'Car':
+            try:
+                volume_vide = float(request.form.get('volume_vide', '') or 0)
+                volume_used = float(request.form.get('volume_used', '') or 0)
+            except ValueError:
+                return "Please enter valid numeric values for car volumes", 400
+            volume = max(volume_vide - volume_used, 0)
+
+            product = Product(
+                client_id=id,
+                reference=reference,
+                quantity=quantity,
+                length=length,
+                width=width,
+                height=height,
+                volume=volume,
+                goods_type='Car',
+                volume_vide=volume_vide,
+                volume_used=volume_used
+            )
+
+        elif goods_type == 'Metals':
+            try:
+                tonnage = float(request.form.get('tonnage', '') or 0)
+            except ValueError:
+                return "Please enter a valid tonnage value", 400
+
+            # For Metals we treat the entered tonnage as the 'quantity' reported to the user
+            # but keep the precise tonnage in product.tonnage. Compute volume from tonnage only.
+            quantity_from_tonnage = int(round(tonnage)) if tonnage else 0
+            # For Products of type Metals, volume must be 0.0 and immutable
+            volume = 0.0
+
+            product = Product(
+                client_id=id,
+                reference=reference,
+                quantity=quantity_from_tonnage or 1,
+                length=length,
+                width=width,
+                height=height,
+                volume=volume,
+                goods_type='Metals',
+                tonnage=tonnage
+            )
+
+        else:
+            # Merchandise / default
+            product = Product(
+                client_id=id,
+                reference=reference,
+                quantity=quantity,
+                length=length,
+                width=width,
+                height=height,
+                volume=volume,
+                goods_type='Merchandise'
+            )
+
         db.session.add(product)
         db.session.commit()
-        
+
         return redirect(url_for('client_products', id=id))
     except Exception as e:
         db.session.rollback()
@@ -581,14 +810,57 @@ def add_product(id):
 def edit_product(id):
     try:
         product = Product.query.get_or_404(id)
-        
         product.reference = request.form.get('reference')
-        product.quantity = int(request.form.get('quantity'))
-        product.length = float(request.form.get('length'))
-        product.width = float(request.form.get('width'))
-        product.height = float(request.form.get('height'))
-        product.volume = product.length * product.width * product.height * product.quantity
-        
+        # Update reference
+        # Only update dimensions/quantity for non-Metals products (Metals don't need these fields)
+
+        # Enforce goods_type immutability: do not allow changing goods type once set on the product.
+        posted_goods_type = request.form.get('goods_type')
+        if product.goods_type:
+            # Keep existing goods_type
+            goods_type = product.goods_type
+        else:
+            # If not set (legacy rows), allow setting once via the edit form
+            goods_type = posted_goods_type or 'Merchandise'
+            product.goods_type = goods_type
+
+        if goods_type != 'Metals':
+            try:
+                product.quantity = int(request.form.get('quantity'))
+                product.length = float(request.form.get('length'))
+                product.width = float(request.form.get('width'))
+                product.height = float(request.form.get('height'))
+            except (TypeError, ValueError):
+                return "Please enter valid numeric values for quantity and dimensions", 400
+
+        if goods_type == 'Car':
+            try:
+                volume_vide = float(request.form.get('volume_vide', '') or 0)
+                volume_used = float(request.form.get('volume_used', '') or 0)
+            except ValueError:
+                return "Please enter valid numeric values for car volumes", 400
+
+            new_volume = max(volume_vide - volume_used, 0)
+            product.volume_vide = volume_vide
+            product.volume_used = volume_used
+            product.volume = new_volume
+
+        elif goods_type == 'Metals':
+            try:
+                tonnage = float(request.form.get('tonnage', '') or 0)
+            except ValueError:
+                return "Please enter a valid tonnage value", 400
+
+            # Treat tonnage as the reported quantity (rounded) but keep precise tonnage
+            product.tonnage = tonnage
+            product.quantity = int(round(tonnage)) if tonnage else product.quantity
+            # For Metals, volume is fixed to 0.0 and cannot be changed
+            product.volume = 0.0
+
+        else:
+            # Merchandise / default: recalc from dimensions
+            product.volume = product.length * product.width * product.height * product.quantity
+
         db.session.commit()
         return redirect(url_for('client_products', id=product.client_id))
     except Exception as e:
@@ -650,7 +922,11 @@ def download_template():
         'Client Mark': ['MARK001', 'MARK002'],
         'Client Name': ['Example Name 1', 'Example Name 2'],
         'Phone': ['1234567890', '0987654321'],  # Plain string format
-        'Volume': [10.5, 15.2]
+        'Goods Type': ['Merchandise', 'Metals'],
+        'Volume': [10.5, ''],
+        'Volume Used': ['', ''],
+        'Tonnage': ['', 2.5],
+        'Price / Tonne': ['', 120.0]
     })
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -688,29 +964,96 @@ def upload_excel(id):
         
         # Read Excel file with phone column as string
         df = pd.read_excel(file, dtype={'Phone': str})
-        
+
         # Process each row
         for _, row in df.iterrows():
             # Create client
             client = Client(
-                name=str(row['Client Name']),
-                mark=str(row['Client Mark']),
-                phone=str(row['Phone']).split('.')[0] if pd.notna(row['Phone']) else '',  # Remove decimal part
+                name=str(row.get('Client Name', '')).strip(),
+                mark=str(row.get('Client Mark', '')).strip(),
+                phone=str(row.get('Phone', '')).split('.')[0] if pd.notna(row.get('Phone', '')) else '',  # Remove decimal part
             )
             db.session.add(client)
-            
-            client_volume = float(row['Volume'])
-            # Use the common price calculation function
+
+            # Determine goods type and compute client_volume accordingly
+            goods_type = str(row.get('Goods Type')).strip() if 'Goods Type' in df.columns and pd.notna(row.get('Goods Type')) else 'Merchandise'
+
+            client_volume = 0.0
+            tonnage = None
+            volume_vide = None
+            volume_used = None
+
+            if goods_type.lower() == 'metals':
+                try:
+                    tonnage = float(row.get('Tonnage')) if 'Tonnage' in df.columns and pd.notna(row.get('Tonnage')) else 0
+                except (ValueError, TypeError):
+                    tonnage = 0
+                # Convert tonne to m3 using container-specific factor
+                tonne_to_m3 = get_tonne_to_m3_for_container(container.container_type)
+                client_volume = tonnage * tonne_to_m3
+
+            elif goods_type.lower() == 'car':
+                try:
+                    # Prefer Volume column to represent Volume Vide (if provided)
+                    volume_vide = float(row.get('Volume')) if 'Volume' in df.columns and pd.notna(row.get('Volume')) else 0
+                except (ValueError, TypeError):
+                    volume_vide = 0
+                try:
+                    volume_used = float(row.get('Volume Used')) if 'Volume Used' in df.columns and pd.notna(row.get('Volume Used')) else 0
+                except (ValueError, TypeError):
+                    volume_used = 0
+                client_volume = max((volume_vide or 0) - (volume_used or 0), 0)
+
+            else:
+                # Merchandise or fallback: use Volume column
+                try:
+                    client_volume = float(row.get('Volume')) if 'Volume' in df.columns and pd.notna(row.get('Volume')) else 0
+                except (ValueError, TypeError):
+                    client_volume = 0
+
+            # Use the common price calculation function as a fallback
             base_price, _ = calculate_client_price(container.price, container.total_volume, client_volume)
-            
-            # Create shipment
-            shipment = Shipment(
+
+            # Allow Metals to supply a Price / Tonne column to calculate price directly
+            price = base_price
+            price_per_tonne_val = None
+            if goods_type.lower() == 'metals':
+                try:
+                    # Accept either 'Price / Tonne' or 'Price_per_tonne' column names
+                    if 'Price / Tonne' in df.columns and pd.notna(row.get('Price / Tonne')):
+                        price_per_tonne_val = float(row.get('Price / Tonne'))
+                    elif 'Price_per_tonne' in df.columns and pd.notna(row.get('Price_per_tonne')):
+                        price_per_tonne_val = float(row.get('Price_per_tonne'))
+                except (ValueError, TypeError):
+                    price_per_tonne_val = None
+
+                # If a price per tonne was provided, use it to compute the shipment price
+                if price_per_tonne_val is not None:
+                    try:
+                        price = round((tonnage or 0) * float(price_per_tonne_val))
+                    except Exception:
+                        price = base_price
+                else:
+                    price = base_price
+
+            # Create shipment kwargs and include goods-specific metadata
+            shipment_kwargs = dict(
                 client=client,
                 container=container,
                 volume=client_volume,
-                price=base_price,  # Use calculated base price
+                price=price,
                 payment_status='unpaid'
             )
+
+            if goods_type.lower() == 'metals':
+                shipment_kwargs['tonnage'] = tonnage
+                if price_per_tonne_val is not None:
+                    shipment_kwargs['price_per_tonne'] = price_per_tonne_val
+            elif goods_type.lower() == 'car':
+                shipment_kwargs['volume_vide'] = volume_vide
+                shipment_kwargs['volume_used'] = volume_used
+
+            shipment = Shipment(**shipment_kwargs)
             db.session.add(shipment)
         
         db.session.commit()
@@ -729,9 +1072,11 @@ def download_products_template():
     df = pd.DataFrame({
         'Reference': ['REF001', 'REF002'],
         'Quantity': [5, 10],
-        'Length': [1.5, 2.0],
-        'Width': [0.8, 1.0],
-        'Height': [0.5, 0.7]
+        'Length (m)': [1.5, 2.0],
+        'Width (m)': [0.8, 1.0],
+        'Height (m)': [0.5, 0.7],
+        'Goods Type': ['Merchandise', 'Car'],
+        'Volume Used': ['', '']
     })
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -772,8 +1117,18 @@ def upload_products(id):
             'Reference': 'Reference',
             'Quantity': 'Quantity',
             'Length': 'Length',
+            'Length (m)': 'Length',
             'Width': 'Width',
+            'Width (m)': 'Width',
             'Height': 'Height',
+            'Height (m)': 'Height',
+            'Goods Type': 'Goods Type',
+            'Tonnage': 'Tonnage',
+            'Tonnage (t)': 'Tonnage',
+            'Price / Tonne': 'Price / Tonne',
+            'Price_per_tonne': 'Price / Tonne',
+            'Volume Vide': 'Volume Vide',
+            'Volume Used': 'Volume Used',
             # French columns
             'Items': 'Reference',
             'Longueur': 'Length',
@@ -800,49 +1155,122 @@ def upload_products(id):
             # Get reference (required field)
             if 'Reference' not in df.columns or pd.isna(row.get('Reference')):
                 continue  # Skip rows without a reference
-                
-            reference = str(row.get('Reference', ''))
-            
-            # Get other fields with defaults
+
+            reference = str(row.get('Reference', '')).strip()
+
+            # Determine goods type (default to Merchandise)
+            goods_type = str(row.get('Goods Type')).strip() if 'Goods Type' in df.columns and pd.notna(row.get('Goods Type')) else 'Merchandise'
+
+            # Read common fields with safe defaults
             try:
                 quantity = int(row.get('Quantity')) if pd.notna(row.get('Quantity')) else 1
             except (ValueError, TypeError):
                 quantity = 1
-                
+
             try:
                 length = float(row.get('Length')) if pd.notna(row.get('Length')) else 0
             except (ValueError, TypeError):
                 length = 0
-                
+
             try:
                 width = float(row.get('Width')) if pd.notna(row.get('Width')) else 0
             except (ValueError, TypeError):
                 width = 0
-                
+
             try:
                 height = float(row.get('Height')) if pd.notna(row.get('Height')) else 0
             except (ValueError, TypeError):
                 height = 0
-            
-            # Calculate volume or use 0 if any dimension is missing
-            if length > 0 and width > 0 and height > 0:
-                volume = length * width * height * quantity
-            else:
-                # Use Volume field if available, otherwise 0
+
+            # Goods-specific parsing and volume calculation
+            volume = 0
+            tonnage = None
+            price_per_tonne = None
+            volume_vide = None
+            volume_used = None
+
+            if goods_type.lower() == 'metals':
                 try:
-                    volume = float(row.get('Volume')) if pd.notna(row.get('Volume')) else 0
+                    tonnage = float(row.get('Tonnage')) if 'Tonnage' in df.columns and pd.notna(row.get('Tonnage')) else 0
                 except (ValueError, TypeError):
-                    volume = 0
-            
-            product = Product(
-                client_id=id,
-                reference=reference,
-                quantity=quantity,
-                length=length,
-                width=width,
-                height=height,
-                volume=volume
-            )
+                    tonnage = 0
+                # For uploaded Metals rows, volume must be 0.0 regardless of tonnage or dimensions
+                quantity_from_tonnage = int(round(tonnage)) if tonnage and tonnage > 0 else quantity
+
+                product = Product(
+                    client_id=id,
+                    reference=reference,
+                    quantity=quantity_from_tonnage or 1,
+                    length=length,
+                    width=width,
+                    height=height,
+                    volume=0.0,
+                    goods_type='Metals',
+                    tonnage=tonnage
+                )
+
+            elif goods_type.lower() == 'car':
+                # Prefer explicit Volume Vide/Used if provided
+                try:
+                    volume_vide = float(row.get('Volume Vide')) if 'Volume Vide' in df.columns and pd.notna(row.get('Volume Vide')) else None
+                except (ValueError, TypeError):
+                    volume_vide = None
+                try:
+                    volume_used = float(row.get('Volume Used')) if 'Volume Used' in df.columns and pd.notna(row.get('Volume Used')) else None
+                except (ValueError, TypeError):
+                    volume_used = None
+
+                # If Volume Vide provided, use it. Otherwise compute from dimensions when possible
+                if volume_vide is not None:
+                    computed_vide = float(volume_vide or 0)
+                elif length > 0 and width > 0 and height > 0:
+                    computed_vide = length * width * height * quantity
+                else:
+                    # Fallback to Volume column if present
+                    try:
+                        computed_vide = float(row.get('Volume')) if pd.notna(row.get('Volume')) else 0
+                    except (ValueError, TypeError):
+                        computed_vide = 0
+
+                # Ensure we persist volume_vide (either provided or computed)
+                volume_vide = computed_vide
+                volume_used = volume_used or 0
+                volume = max(volume_vide - volume_used, 0)
+
+                product = Product(
+                    client_id=id,
+                    reference=reference,
+                    quantity=quantity,
+                    length=length,
+                    width=width,
+                    height=height,
+                    volume=volume,
+                    goods_type='Car',
+                    volume_vide=volume_vide,
+                    volume_used=volume_used
+                )
+
+            else:
+                # Merchandise or default: prefer dimensions, otherwise Volume column
+                if length > 0 and width > 0 and height > 0:
+                    volume = length * width * height * quantity
+                else:
+                    try:
+                        volume = float(row.get('Volume')) if pd.notna(row.get('Volume')) else 0
+                    except (ValueError, TypeError):
+                        volume = 0
+
+                product = Product(
+                    client_id=id,
+                    reference=reference,
+                    quantity=quantity,
+                    length=length,
+                    width=width,
+                    height=height,
+                    volume=volume,
+                    goods_type='Merchandise'
+                )
+
             db.session.add(product)
             processed_count += 1
         
@@ -1005,6 +1433,79 @@ def get_shipment_details(id):
             'paid_amount': shipment.paid_amount if shipment.paid_amount else 0,
             'volume': shipment.volume
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/shipment-products/<int:shipment_id>')
+@login_required
+def get_shipment_products(shipment_id):
+    """Return JSON with products for the client related to a shipment and per-product price allocation.
+
+    Allocation rules:
+    - For Metals: allocate shipment.price proportionally by product.tonnage
+    - For other goods: allocate shipment.price proportionally by product.volume
+    Falls back gracefully if totals are zero.
+    """
+    try:
+        shipment = Shipment.query.get_or_404(shipment_id)
+        client_id = shipment.client_id
+        container = shipment.container
+
+        # Get products for this client (all products)
+        products = Product.query.filter_by(client_id=client_id).all()
+
+        # Compute totals for allocation
+        total_tonnage = sum((p.tonnage or 0) for p in products if p.goods_type == 'Metals')
+        total_volume = sum((p.volume or 0) for p in products if p.goods_type != 'Metals')
+
+        product_list = []
+        for p in products:
+            p_tonnage = float(p.tonnage or 0)
+            p_volume = float(p.volume or 0)
+
+            # Determine allocation
+            allocated_price = 0.0
+            if p.goods_type == 'Metals':
+                if total_tonnage > 0:
+                    allocated_price = (p_tonnage / total_tonnage) * float(shipment.price or 0)
+                else:
+                    allocated_price = 0.0
+            else:
+                if total_volume > 0:
+                    allocated_price = (p_volume / total_volume) * float(shipment.price or 0)
+                else:
+                    allocated_price = 0.0
+
+            product_list.append({
+                'id': p.id,
+                'reference': p.reference,
+                'goods_type': p.goods_type,
+                'quantity': p.quantity,
+                'length': p.length,
+                'width': p.width,
+                'height': p.height,
+                'volume_vide': p.volume_vide,
+                'volume_used': p.volume_used,
+                'volume': p.volume,
+                'tonnage': p.tonnage,
+                'allocated_price': round(allocated_price, 2)
+            })
+
+        response = {
+            'shipment_id': shipment.id,
+            'client_id': client_id,
+            'client_mark': shipment.client.mark,
+            'client_name': shipment.client.name,
+            'container_number': container.container_number if container else None,
+            'shipment_price': float(shipment.price or 0),
+            'extra_charge': float(shipment.extra_charge or 0),
+            'paid_amount': float(shipment.paid_amount or 0),
+            'payment_status': shipment.payment_status,
+            'products': product_list
+        }
+
+        return jsonify(response)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

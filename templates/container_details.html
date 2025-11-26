@@ -738,6 +738,9 @@ function printClientRow(shipmentId, currency = 'aed') {
             const extraCharge = parseFloat(data.extra_charge || 0);
             const paymentStatus = data.payment_status || '';
             const paidAmountVal = parseFloat(data.paid_amount || 0);
+            
+            // Use shipment volume instead of calculating from products
+            const shipmentVolume = parseFloat(data.shipment_volume || 0);
 
             // Group products by goods_type
             const groups = {};
@@ -801,7 +804,7 @@ function printClientRow(shipmentId, currency = 'aed') {
             // Compute totals and format currency (convert shipment/extra/paid to target currency)
             const productsTotalFormatted = Number(productsTotal).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 
-            // Compute total volumes (m3), total volume_vide/used and total tonnage for Metals
+            // Compute total volumes (m3), total volume_vide/used and total tonnage for Metals (for products display)
             let totalVolume = 0;
             let totalTonnage = 0;
             let totalVolumeVide = 0;
@@ -820,6 +823,9 @@ function printClientRow(shipmentId, currency = 'aed') {
             const totalTonnageFormatted = Number(totalTonnage).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
             const totalVolumeVideFormatted = Number(totalVolumeVide).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
             const totalVolumeUsedFormatted = Number(totalVolumeUsed).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            
+            // Format shipment volume for second page display
+            const shipmentVolumeFormatted = Number(shipmentVolume).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 
             const shipmentPriceDisplayVal = convertForCurrency(shipmentPrice);
             const extraChargeDisplayVal = convertForCurrency(extraCharge);
@@ -892,6 +898,28 @@ function printClientRow(shipmentId, currency = 'aed') {
                             .client-info { background:#f8f9fa; border:1px solid #e9ecef; padding:10px 12px; border-radius:6px; min-width:240px; }
                             .client-info p { margin:4px 0; font-size:14px; }
                             .client-info .label { color:#555; font-weight:600; margin-right:6px; }
+                            
+                            /* Page break styling for second page */
+                            .page-break { page-break-before: always; }
+                            .summary-page { padding: 30px; }
+                            .summary-header { text-align: center; margin-bottom: 30px; }
+                            .summary-header h1 { color: #2c3e50; font-size: 24px; margin-bottom: 5px; }
+                            .summary-header .priority { font-size: 16px; font-weight: bold; color: #666; }
+                            .summary-client { background: #f8f9fa; border: 2px solid #2c3e50; padding: 25px; margin: 35px 0; border-radius: 6px; }
+                            .summary-client h3 { color: #2c3e50; margin-bottom: 20px; font-size: 18px; }
+                            .summary-client .info-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px; }
+                            .summary-client .label { font-weight: bold; color: #333; }
+                            .summary-totals { margin: 40px 0; }
+                            .summary-totals table { width: 100%; border-collapse: collapse; }
+                            .summary-totals th, .summary-totals td { padding: 15px; border-bottom: 1px solid #ddd; font-size: 16px; }
+                            .summary-totals th { background: #2c3e50; color: white; text-align: left; }
+                            .summary-totals .total-row { font-weight: bold; font-size: 18px; background: #f0f0f0; }
+                            .summary-contacts { margin-top: 50px; }
+                            .summary-contacts .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+                            .summary-contacts .contact-section { background: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #2c3e50; }
+                            .summary-contacts h4 { color: #2c3e50; margin-bottom: 12px; font-size: 16px; font-weight: bold; }
+                            .summary-contacts p { margin: 8px 0; font-size: 14px; }
+                            .summary-contacts .agency { grid-column: 1 / -1; margin-top: 20px; text-align: center; }
                         </style>
                     </head>
                     <body>
@@ -938,21 +966,52 @@ function printClientRow(shipmentId, currency = 'aed') {
                         ${isPartial ? `<div style="margin-top:12px;border:1px solid #ddd;padding:10px;background:#f9f9f9;">` +
                             `<strong>Payment Details:</strong><br/>Paid: ${paidAmount}<br/>Remaining: ${remainingAmount}</div>` : ''}
 
-                        <div class="contacts">
-                            <div class="columns">
-                                <div class="contact">
-                                    <h4>Information in Dubai</h4>
-                                    <p><strong>PAPA LALY</strong>: +971 55 309 9610</p>
-                                    <p><strong>AHMED</strong>: +971 55 215 4173</p>
+                        <!-- Second Page: Client Summary -->
+                        <div class="page-break summary-page">
+                            <div class="header">
+                                <div class="header-row">
+                                    <div class="header-left">
+                                        <h2>Container #${containerNumber}</h2>
+                                        <span class="status-badge ${isSurEtStart ? 'status-danger' : 'status-normal'}">${statusText}</span>
+                                    </div>
+                                    <div class="client-info">
+                                        <p><span class="label">Client Name:</span> ${clientName}</p>
+                                        <p><span class="label">Mark:</span> ${clientMark}</p>
+                                        <p><span class="label">Phone:</span> ${clientPhone}</p>
+                                    </div>
                                 </div>
-                                <div class="contact">
-                                    <h4>Information in Comoros</h4>
-                                    <p><strong>MOHAMED ABDALLAH</strong>: 492 40 19 / 342 40 19</p>
-                                </div>
-                                <div class="contact agency">
-                                    <h4>Agence in Comoros</h4>
-                                    <p><strong>AGENCE ALVARO MORONI BACHA</strong></p>
-                                    <p>Tel: 338 91 61</p>
+                            </div>
+                            
+                            <div class="summary-totals">
+                                <table>
+                                    <tr>
+                                        <th>Volume (m³)</th>
+                                        <td>${shipmentVolumeFormatted}</td>
+                                    </tr>
+                                    <tr class="total-row">
+                                        <th>Total to Pay</th>
+                                        <td>${formattedFullTotal}</td>
+                                    </tr>
+                                    ${isPartial ? `<tr><th>Amount Paid</th><td>${paidAmount}</td></tr><tr><th>Remaining</th><td>${remainingAmount}</td></tr>` : ''}
+                                </table>
+                            </div>
+                            
+                            <div class="summary-contacts">
+                                <div class="contact-grid">
+                                    <div class="contact-section">
+                                        <h4>Information in Dubai</h4>
+                                        <p><strong>PAPA LALY</strong>: +971 55 309 9610</p>
+                                        <p><strong>AHMED</strong>: +971 55 215 4173</p>
+                                    </div>
+                                    <div class="contact-section">
+                                        <h4>Information in Comoros</h4>
+                                        <p><strong>MOHAMED ABDALLAH</strong>: 492 40 19 / 342 40 19</p>
+                                    </div>
+                                    <div class="contact-section agency">
+                                        <h4>Agence in Comoros</h4>
+                                        <p><strong>AGENCE ALVARO MORONI BACHA</strong></p>
+                                        <p>Tel: 338 91 61</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

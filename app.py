@@ -1515,6 +1515,7 @@ def get_shipment_products(shipment_id):
             'extra_charge': float(shipment.extra_charge or 0),
             'paid_amount': float(shipment.paid_amount or 0),
             'payment_status': shipment.payment_status,
+            'shipment_volume': float(shipment.volume or 0),
             'products': product_list
         }
 

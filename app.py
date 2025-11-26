@@ -343,6 +343,11 @@ def edit_container(id):
     try:
         container = Container.query.get_or_404(id)
         
+        # Store old values for comparison
+        old_price = container.price
+        old_volume = container.total_volume
+        
+        # Update container information
         container.container_number = request.form.get('container_number')
         container.container_name = request.form.get('container_name')
         container.container_type = request.form.get('container_type')
@@ -354,11 +359,44 @@ def edit_container(id):
         # The checkbox will be present as 'on' when checked in most browsers
         container.sur_et_start = bool(sur_et_start_val) and sur_et_start_val not in ('false', '0', '')
         
+        # Check if price or volume changed - if so, recalculate all shipment prices
+        price_changed = old_price != container.price
+        volume_changed = old_volume != container.total_volume
+        
+        if price_changed or volume_changed:
+            # Get all shipments for this container
+            shipments = Shipment.query.filter_by(container_id=id).all()
+            updated_count = 0
+            
+            for shipment in shipments:
+                # Skip Metals shipments that have price_per_tonne set (manual pricing)
+                if shipment.tonnage and shipment.price_per_tonne:
+                    continue
+                
+                # Recalculate price based on new container price/volume
+                base_price, total_price = calculate_client_price(
+                    container.price, 
+                    container.total_volume, 
+                    shipment.volume, 
+                    shipment.extra_charge
+                )
+                
+                # Update shipment price (base price without extra charge)
+                shipment.price = base_price
+                updated_count += 1
+            
+            if updated_count > 0:
+                flash(f'Container updated successfully. Recalculated prices for {updated_count} shipments.', 'success')
+            else:
+                flash('Container updated successfully.', 'success')
+        else:
+            flash('Container updated successfully.', 'success')
+        
         db.session.commit()
-        flash('Container updated successfully')
+        
     except Exception as e:
         db.session.rollback()
-        flash(f'Error updating container: {str(e)}')
+        flash(f'Error updating container: {str(e)}', 'danger')
 
     # After editing, return to the container details page so the user remains in context
     return redirect(url_for('container_details', id=id))

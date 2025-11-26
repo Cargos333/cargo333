@@ -125,7 +125,7 @@
                                     <td>{{ shipment.client.name }}</td>
                                     <td>{{ shipment.client.mark }}</td>
                                     <td>{{ shipment.client.phone }}</td>
-                                    <td>{{ shipment.volume }}</td>
+                                    <td>{{ "%.2f"|format(shipment.volume) }}</td>
                                     <td>AED {{ shipment.price|format_number }}</td>
                                     <td>AED {{ shipment.extra_charge|format_number }}</td>
                                     <td>
@@ -152,7 +152,8 @@
                             </tbody>
                             <tfoot>
                                 <tr class="table-secondary fw-bold">
-                                    <td colspan="4" class="text-end">Total:</td>
+                                    <td colspan="3" class="text-end">Total:</td>
+                                    <td>{{ "%.2f"|format(selected_container.shipments|sum(attribute='volume')) }} m³</td>
                                     <td>AED {{ selected_container.shipments|sum(attribute='price')|format_number }}</td>
                                     <td>AED {{ selected_container.shipments|sum(attribute='extra_charge')|format_number }}</td>
                                     <td>AED {{ (selected_container.shipments|sum(attribute='price') + selected_container.shipments|sum(attribute='extra_charge'))|format_number }}</td>

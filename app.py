@@ -260,6 +260,36 @@ def download_single_document(container_id, doc_id):
         flash(f'Error downloading document: {str(e)}', 'danger')
         return redirect(url_for('container_details', id=container_id))
 
+@app.route('/container/<int:container_id>/document/<int:doc_id>/view')
+@login_required
+def view_single_document(container_id, doc_id):
+    """View/preview a single document (inline, not download)"""
+    try:
+        document = ContainerDocument.query.get_or_404(doc_id)
+        
+        # Verify document belongs to this container
+        if document.container_id != container_id:
+            return jsonify({'error': 'Invalid document'}), 400
+        
+        # Determine mimetype based on file type
+        if document.file_type == 'pdf':
+            mimetype = 'application/pdf'
+        else:
+            # Determine image mimetype from extension
+            ext = document.original_filename.rsplit('.', 1)[1].lower() if '.' in document.original_filename else 'png'
+            mimetype = f'image/{ext}' if ext in ['png', 'jpg', 'jpeg', 'gif'] else 'application/octet-stream'
+        
+        import io
+        return send_file(
+            io.BytesIO(document.file_data),
+            mimetype=mimetype,
+            as_attachment=False,  # Display inline instead of downloading
+            download_name=document.original_filename
+        )
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/container/<int:container_id>/document/<int:doc_id>/delete', methods=['POST'])
 @login_required
 def delete_container_document(container_id, doc_id):

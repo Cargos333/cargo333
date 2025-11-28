@@ -11,8 +11,7 @@ CREATE TABLE IF NOT EXISTS container_document (
     file_size INTEGER NOT NULL,
     uploaded_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
     uploaded_by INTEGER,
-    FOREIGN KEY (container_id) REFERENCES container(id) ON DELETE CASCADE,
-    FOREIGN KEY (uploaded_by) REFERENCES "user"(id)
+    FOREIGN KEY (container_id) REFERENCES container(id) ON DELETE CASCADE
 );
 
 -- Create index for faster lookups

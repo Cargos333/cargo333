@@ -45,6 +45,12 @@
                             <small class="text-muted ms-2">({{ (doc.file_size / 1024)|round(1) }} KB)</small>
                         </div>
                         <div>
+                            <button class="btn btn-sm btn-outline-info me-2 preview-document-btn" 
+                                    data-doc-id="{{ doc.id }}"
+                                    data-filename="{{ doc.original_filename }}"
+                                    data-file-type="{{ doc.file_type }}">
+                                <i class="bi bi-eye"></i>
+                            </button>
                             <a href="{{ url_for('download_single_document', container_id=container.id, doc_id=doc.id) }}" 
                                class="btn btn-sm btn-outline-primary me-2">
                                 <i class="bi bi-download"></i>
@@ -89,6 +95,28 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="uploadDocumentsBtn">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Preview Modal -->
+    <div class="modal fade" id="previewDocumentModal" tabindex="-1" aria-labelledby="previewDocumentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="previewDocumentModalLabel">Document Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="min-height: 500px;">
+                    <div id="previewContent" class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -2004,6 +2032,33 @@ document.addEventListener('click', function(event) {
             .catch(error => {
                 alert('Error deleting document');
             });
+        }
+    }
+    
+    // Document preview functionality
+    const previewBtn = event.target.closest('.preview-document-btn');
+    if (previewBtn) {
+        const docId = previewBtn.dataset.docId;
+        const filename = previewBtn.dataset.filename;
+        const fileType = previewBtn.dataset.fileType;
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('previewDocumentModal'));
+        document.getElementById('previewDocumentModalLabel').textContent = filename;
+        
+        const previewContent = document.getElementById('previewContent');
+        previewContent.innerHTML = '<div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>';
+        
+        modal.show();
+        
+        // Build the preview URL
+        const viewUrl = '{{ url_for("view_single_document", container_id=container.id, doc_id=0) }}'.replace('/0/', `/${docId}/`);
+        
+        // Display based on file type
+        if (fileType === 'pdf') {
+            previewContent.innerHTML = `<embed src="${viewUrl}" type="application/pdf" width="100%" height="600px" />`;
+        } else {
+            previewContent.innerHTML = `<img src="${viewUrl}" class="img-fluid" alt="${filename}" style="max-height: 600px;" />`;
         }
     }
 });

@@ -422,11 +422,17 @@ def edit_shipment(id):
         client = shipment.client
         container = shipment.container
         
-        # Do NOT allow editing client mark or name from this modal; only allow phone updates.
-        # Ignore any posted client_name/client_mark to enforce immutability server-side.
+        # Update phone for ALL clients with the same mark (case-insensitive)
         posted_client_phone = request.form.get('client_phone')
-        if posted_client_phone is not None:
-            client.phone = posted_client_phone
+        if posted_client_phone is not None and posted_client_phone != client.phone:
+            # Find all clients with the same mark (case-insensitive)
+            clients_with_same_mark = Client.query.filter(
+                db.func.lower(Client.mark) == db.func.lower(client.mark)
+            ).all()
+            
+            # Update phone for all matching clients
+            for matching_client in clients_with_same_mark:
+                matching_client.phone = posted_client_phone
         
         # Update shipment info
         # Support Metals edits: prefer tonnage/price_per_tonne when provided

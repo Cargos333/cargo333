@@ -1835,6 +1835,10 @@ def client_records():
     # Convert string to boolean - anything other than 'true' (case-insensitive) is False
     group_by_mark = group_by_mark_param.lower() == 'true'
     
+    # Check for missing phone filter
+    missing_phone_param = request.args.get('missing_phone', 'false')
+    missing_phone = missing_phone_param.lower() == 'true'
+    
     if group_by_mark:
         # First, get unique client marks
         subq = db.session.query(
@@ -1848,6 +1852,16 @@ def client_records():
                     Client.mark.ilike(f'%{search_query}%'),
                     Client.name.ilike(f'%{search_query}%'),
                     Client.phone.ilike(f'%{search_query}%')
+                )
+            )
+        
+        # Apply missing phone filter
+        if missing_phone:
+            subq = subq.filter(
+                db.or_(
+                    Client.phone == None,
+                    Client.phone == '',
+                    Client.phone == '+'
                 )
             )
         
@@ -1869,6 +1883,16 @@ def client_records():
                     Client.name.ilike(f'%{search_query}%'),
                     Client.mark.ilike(f'%{search_query}%'),
                     Client.phone.ilike(f'%{search_query}%')
+                )
+            )
+        
+        # Apply missing phone filter
+        if missing_phone:
+            client_query = client_query.filter(
+                db.or_(
+                    Client.phone == None,
+                    Client.phone == '',
+                    Client.phone == '+'
                 )
             )
     
@@ -2023,6 +2047,7 @@ def client_records():
         total_clients=total_clients,
         pagination=pagination,
         group_by_mark=group_by_mark,
+        missing_phone=missing_phone,
         client_shipments=client_shipments
     )
 

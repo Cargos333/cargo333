@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for, flash, send_file,
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_config import app, db
-from models import Container, Client, Shipment, User, Product
+from models import Container, Client, Shipment, User, Product, ContainerDocument
 from decorators import admin_required, secretary_required, manager_required
 from utils import format_number
 import pandas as pd
@@ -133,6 +133,152 @@ def container_details(id):
     # Provide container-specific tonne->m3 conversion to the template
     container_tonne_to_m3 = get_tonne_to_m3_for_container(container.container_type)
     return render_template('container_details.html', container=container, TONNE_TO_M3=TONNE_TO_M3, container_tonne_to_m3=container_tonne_to_m3)
+
+@app.route('/container/<int:id>/upload-documents', methods=['POST'])
+@login_required
+def upload_container_documents(id):
+    """Upload documents (PDFs and images) for a container"""
+    try:
+        container = Container.query.get_or_404(id)
+        
+        if 'documents' not in request.files:
+            return jsonify({'success': False, 'message': 'No files uploaded'}), 400
+        
+        files = request.files.getlist('documents')
+        uploaded_count = 0
+        
+        for file in files:
+            if file and file.filename:
+                # Validate file type
+                allowed_extensions = {'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+                filename = file.filename.lower()
+                file_ext = filename.rsplit('.', 1)[1] if '.' in filename else ''
+                
+                if file_ext not in allowed_extensions:
+                    continue
+                
+                # Determine file type
+                file_type = 'pdf' if file_ext == 'pdf' else 'image'
+                
+                # Read file data
+                file_data = file.read()
+                file_size = len(file_data)
+                
+                # Create unique filename
+                import uuid
+                unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+                
+                # Create document record
+                document = ContainerDocument(
+                    container_id=container.id,
+                    filename=unique_filename,
+                    original_filename=file.filename,
+                    file_data=file_data,
+                    file_type=file_type,
+                    file_size=file_size,
+                    uploaded_by=current_user.id
+                )
+                
+                db.session.add(document)
+                uploaded_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{uploaded_count} document(s) uploaded successfully',
+            'count': uploaded_count
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/container/<int:id>/download-documents')
+@login_required
+def download_container_documents(id):
+    """Download all documents for a container as a ZIP file"""
+    try:
+        container = Container.query.get_or_404(id)
+        documents = ContainerDocument.query.filter_by(container_id=id).all()
+        
+        if not documents:
+            flash('No documents to download', 'warning')
+            return redirect(url_for('container_details', id=id))
+        
+        # Create ZIP file in memory
+        import io
+        import zipfile
+        
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for doc in documents:
+                zf.writestr(doc.original_filename, doc.file_data)
+        
+        memory_file.seek(0)
+        
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'container_{container.container_number}_documents.zip'
+        )
+    
+    except Exception as e:
+        flash(f'Error downloading documents: {str(e)}', 'danger')
+        return redirect(url_for('container_details', id=id))
+
+@app.route('/container/<int:container_id>/document/<int:doc_id>/download')
+@login_required
+def download_single_document(container_id, doc_id):
+    """Download a single document"""
+    try:
+        document = ContainerDocument.query.get_or_404(doc_id)
+        
+        # Verify document belongs to this container
+        if document.container_id != container_id:
+            flash('Invalid document', 'danger')
+            return redirect(url_for('container_details', id=container_id))
+        
+        # Determine mimetype based on file type
+        if document.file_type == 'pdf':
+            mimetype = 'application/pdf'
+        else:
+            # Determine image mimetype from extension
+            ext = document.original_filename.rsplit('.', 1)[1].lower() if '.' in document.original_filename else 'png'
+            mimetype = f'image/{ext}' if ext in ['png', 'jpg', 'jpeg', 'gif'] else 'application/octet-stream'
+        
+        import io
+        return send_file(
+            io.BytesIO(document.file_data),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=document.original_filename
+        )
+    
+    except Exception as e:
+        flash(f'Error downloading document: {str(e)}', 'danger')
+        return redirect(url_for('container_details', id=container_id))
+
+@app.route('/container/<int:container_id>/document/<int:doc_id>/delete', methods=['POST'])
+@login_required
+def delete_container_document(container_id, doc_id):
+    """Delete a single document"""
+    try:
+        document = ContainerDocument.query.get_or_404(doc_id)
+        
+        # Verify document belongs to this container
+        if document.container_id != container_id:
+            return jsonify({'success': False, 'message': 'Invalid document'}), 400
+        
+        db.session.delete(document)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Document deleted successfully'})
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/container/create', methods=['POST'])
 @login_required

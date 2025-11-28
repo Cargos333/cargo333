@@ -24,6 +24,7 @@ class Container(db.Model):
     connaissement_pdf = db.Column(db.LargeBinary)
     pdf_filename = db.Column(db.String(255))
     shipments = db.relationship('Shipment', backref='container', lazy=True)
+    documents = db.relationship('ContainerDocument', backref='container', lazy=True, cascade='all, delete-orphan')
 
 class Shipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -62,6 +63,17 @@ class Product(db.Model):
 
     def calculate_volume(self):
         return self.length * self.width * self.height * self.quantity
+
+class ContainerDocument(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    container_id = db.Column(db.Integer, db.ForeignKey('container.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_data = db.Column(db.LargeBinary, nullable=False)
+    file_type = db.Column(db.String(50), nullable=False)  # pdf, image
+    file_size = db.Column(db.Integer, nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)

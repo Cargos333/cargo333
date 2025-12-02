@@ -47,27 +47,33 @@ def fix_user_is_active_column():
         if current_type:
             print(f"Current type: {current_type[0]}")
         
-        # Convert existing data to boolean values (0/1 to false/true)
-        print("Converting existing data...")
+        # Convert bigint values: ensure 0 stays 0 and non-zero becomes 1
+        print("Normalizing existing data to 0 or 1...")
         cursor.execute("""
             UPDATE "user" 
             SET is_active = CASE 
-                WHEN is_active = 0 THEN false 
-                ELSE true 
+                WHEN is_active = 0 THEN 0::bigint
+                ELSE 1::bigint
             END
-            WHERE is_active IN (0, 1)
         """)
         
+        conn.commit()
+        print("✓ Data normalized")
+        
         # Change column type to boolean
-        print("Changing column type to boolean...")
+        print("Changing column type from bigint to boolean...")
         cursor.execute("""
             ALTER TABLE "user" 
             ALTER COLUMN is_active TYPE BOOLEAN 
             USING CASE 
                 WHEN is_active = 0 THEN false 
+                WHEN is_active = 1 THEN true
                 ELSE true 
             END
         """)
+        
+        conn.commit()
+        print("✓ Column type changed to boolean")
         
         # Set default value
         print("Setting default value...")

@@ -8,7 +8,11 @@ from werkzeug.security import generate_password_hash
 
 def init_production_db():
     with app.app_context():
-        print("Creating database tables for production...")
+        print("Dropping existing tables and creating new ones...")
+        
+        # Drop all existing tables and create fresh ones
+        db.drop_all()
+        print("Existing tables dropped.")
         
         # Create all tables
         db.create_all()

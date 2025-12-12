@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h1>Couriers</h1>
+    
+    <!-- Create Courier Button -->
+    {% if current_user.role != 'Secretary' %}
+    <div class="mb-4">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCourierModal">
+            <i class="fas fa-plus"></i> Create New Courier
+        </button>
+    </div>
+    {% endif %}
+    
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <!-- Couriers List -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">All Couriers</h5>
+            {% if couriers %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Courier ID</th>
+                            <th>Date</th>
+                            <th>Items Count</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for courier in couriers %}
+                        <tr>
+                            <td><strong>{{ courier.courier_id }}</strong></td>
+                            <td>{{ courier.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ courier.items|length }}</td>
+                            <td>{{ courier.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <a href="{{ url_for('courier_details', id=courier.id) }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                                {% if current_user.role != 'Secretary' %}
+                                <button class="btn btn-sm btn-danger" onclick="deleteCourier({{ courier.id }}, '{{ courier.courier_id }}')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No couriers found. Create your first courier above.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Create Courier Modal -->
+<div class="modal fade" id="createCourierModal" tabindex="-1" aria-labelledby="createCourierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createCourierModalLabel">Create New Courier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('create_courier') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="courier_id" class="form-label">Courier ID</label>
+                        <input type="text" class="form-control" id="courier_id" name="courier_id" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="date" class="form-label">Date</label>
+                        <input type="date" class="form-control" id="date" name="date" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Courier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteCourier(id, courierId) {
+    // First check if courier is approved
+    fetch(`/courier/${id}/is-approved`)
+        .then(response => response.json())
+        .then(data => {
+            let confirmMessage;
+            if (data.is_approved) {
+                confirmMessage = `⚠️ WARNING: Courier ${courierId} has been APPROVED by secretary.\n\nDeleting this courier will permanently remove all approved items and their records.\n\nAre you sure you want to delete this approved courier?`;
+            } else {
+                confirmMessage = `Are you sure you want to delete courier ${courierId}? This will also delete all items.`;
+            }
+            
+            if (confirm(confirmMessage)) {
+                fetch(`/courier/${id}/delete`, {
+                    method: 'POST'
+                })
+                .then(() => {
+                    location.reload();
+                })
+                .catch(error => {
+                    alert('Error deleting courier');
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error checking courier status:', error);
+            // Fallback to basic confirmation
+            if (confirm(`Are you sure you want to delete courier ${courierId}?`)) {
+                fetch(`/courier/${id}/delete`, {
+                    method: 'POST'
+                })
+                .then(() => {
+                    location.reload();
+                })
+                .catch(error => {
+                    alert('Error deleting courier');
+                });
+            }
+        });
+}
+
+// Set today's date as default
+document.getElementById('date').valueAsDate = new Date();
+</script>
+{% endblock %}

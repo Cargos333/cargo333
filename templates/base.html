@@ -173,6 +173,9 @@
                     <a href="{{ url_for('client_records') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('client_records') else '' }}">
                         <i class="fas fa-users"></i> Client Records
                     </a>
+                    <a href="{{ url_for('couriers') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('couriers') or '/courier/' in request.path else '' }}">
+                        <i class="fas fa-envelope"></i> Couriers
+                    </a>
                     
                     <div class="sidebar-bottom">
                         <a href="{{ url_for('logout') }}" class="list-group-item list-group-item-action">

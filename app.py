@@ -2,13 +2,14 @@ from flask import render_template, request, redirect, url_for, flash, send_file,
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_config import app, db
-from models import Container, Client, Shipment, User, Product, ContainerDocument
+from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem
 from decorators import admin_required, secretary_required, manager_required
 from utils import format_number
 import pandas as pd
 import io
 from io import BytesIO
 import os
+from datetime import datetime
 
 # Add these constants at the top of the file
 CONTAINER_TYPES = ['40ft', '20ft']
@@ -44,7 +45,7 @@ app.jinja_env.filters['format_number'] = format_number
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -2287,6 +2288,305 @@ def delete_client_from_records(id):
     group_by_mark = request.args.get('group_by_mark', 'true')
     
     return redirect(url_for('client_records', search=search_query, page=page, group_by_mark=group_by_mark))
+
+# Courier Routes
+@app.route('/couriers')
+@login_required
+def couriers():
+    """List all couriers"""
+    couriers = Courier.query.order_by(Courier.created_at.desc()).all()
+    return render_template('couriers.html', couriers=couriers)
+
+@app.route('/courier/create', methods=['POST'])
+@login_required
+def create_courier():
+    """Create a new courier"""
+    try:
+        courier_id = request.form.get('courier_id')
+        date_str = request.form.get('date')
+        
+        from datetime import datetime
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        new_courier = Courier(
+            courier_id=courier_id,
+            date=date
+        )
+        
+        db.session.add(new_courier)
+        db.session.commit()
+        
+        flash(f'Courier {courier_id} created successfully', 'success')
+        return redirect(url_for('courier_details', id=new_courier.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating courier: {str(e)}', 'danger')
+        return redirect(url_for('couriers'))
+
+@app.route('/courier/<int:id>')
+@login_required
+def courier_details(id):
+    """View courier details and items"""
+    courier = Courier.query.get_or_404(id)
+    items = CourierItem.query.filter_by(courier_id=id).order_by(CourierItem.id).all()
+    
+    # Get active containers for dropdown
+    active_containers = Container.query.filter_by(status='active').order_by(Container.container_number).all()
+    
+    # Create a mapping of container_number to container for easy lookup
+    containers_map = {c.container_number: c for c in Container.query.all()}
+    
+    # Get clients/marks for each container
+    container_clients = {}
+    for container in active_containers:
+        # Get unique client marks in this container
+        clients = db.session.query(Client.mark, Client.name).join(
+            Shipment, Client.id == Shipment.client_id
+        ).filter(
+            Shipment.container_id == container.id
+        ).distinct().order_by(Client.mark).all()
+        container_clients[container.container_number] = clients
+    
+    # Calculate totals
+    total_amount = sum(item.amount for item in items)
+    total_service = sum(item.service for item in items)
+    total_euro = sum(item.money_in_euro for item in items)
+    total_aed = sum(item.money_in_aed for item in items)
+    
+    # Calculate total money received (only for approved items)
+    total_money_received = sum(
+        item.money_received for item in items 
+        if item.is_received and item.money_received is not None
+    )
+    
+    # Calculate benefit (only if items are approved)
+    benefit = total_money_received - total_aed if total_money_received > 0 else 0
+    
+    return render_template('courier_details.html', 
+                         courier=courier, 
+                         items=items,
+                         active_containers=active_containers,
+                         containers_map=containers_map,
+                         container_clients=container_clients,
+                         total_amount=total_amount,
+                         total_service=total_service,
+                         total_euro=total_euro,
+                         total_aed=total_aed,
+                         total_money_received=total_money_received,
+                         benefit=benefit)
+
+@app.route('/courier/<int:id>/add-item', methods=['POST'])
+@login_required
+def add_courier_item(id):
+    """Add an item to a courier"""
+    try:
+        courier = Courier.query.get_or_404(id)
+        
+        # Check if courier has any approved items
+        approved_item = CourierItem.query.filter_by(
+            courier_id=courier.id,
+            is_received=True
+        ).first()
+        
+        if approved_item:
+            flash('Cannot add items to an approved courier', 'danger')
+            return redirect(url_for('courier_details', id=id))
+        
+        new_item = CourierItem(
+            courier_id=courier.id,
+            container_number=request.form.get('container_number') or None,
+            sender_name=request.form.get('sender_name'),
+            receiver_name=request.form.get('receiver_name'),
+            amount=float(request.form.get('amount')),
+            service=float(request.form.get('service')),
+            exchange_rate=float(request.form.get('exchange_rate'))
+        )
+        
+        db.session.add(new_item)
+        db.session.commit()
+        
+        flash('Item added successfully', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error adding item: {str(e)}', 'danger')
+    
+    return redirect(url_for('courier_details', id=id))
+
+@app.route('/courier/<int:courier_id>/item/<int:item_id>/edit', methods=['POST'])
+@login_required
+def edit_courier_item(courier_id, item_id):
+    """Edit a courier item"""
+    try:
+        item = CourierItem.query.get_or_404(item_id)
+        
+        # Prevent editing if item is approved
+        if item.is_received:
+            return jsonify({'success': False, 'message': 'Cannot edit approved items'}), 403
+        
+        item.container_number = request.form.get('container_number') or None
+        item.sender_name = request.form.get('sender_name')
+        item.receiver_name = request.form.get('receiver_name')
+        item.amount = float(request.form.get('amount'))
+        item.service = float(request.form.get('service'))
+        item.exchange_rate = float(request.form.get('exchange_rate'))
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Item updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/courier/<int:courier_id>/item/<int:item_id>/delete', methods=['POST'])
+@login_required
+def delete_courier_item(courier_id, item_id):
+    """Delete a courier item"""
+    try:
+        item = CourierItem.query.get_or_404(item_id)
+        
+        # Prevent deleting if item is approved
+        if item.is_received:
+            return jsonify({'success': False, 'message': 'Cannot delete approved items'}), 403
+        
+        db.session.delete(item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Item deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/courier/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_courier(id):
+    """Delete a courier"""
+    try:
+        courier = Courier.query.get_or_404(id)
+        
+        # Check if courier has any approved items (but allow deletion with force parameter)
+        approved_item = CourierItem.query.filter_by(
+            courier_id=courier.id,
+            is_received=True
+        ).first()
+        
+        is_approved = bool(approved_item)
+        
+        db.session.delete(courier)
+        db.session.commit()
+        
+        if is_approved:
+            flash('Approved courier deleted successfully', 'warning')
+        else:
+            flash('Courier deleted successfully', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting courier: {str(e)}', 'danger')
+    
+    return redirect(url_for('couriers'))
+
+@app.route('/courier/<int:id>/is-approved', methods=['GET'])
+@login_required
+def check_courier_approved(id):
+    """Check if a courier has approved items"""
+    try:
+        courier = Courier.query.get_or_404(id)
+        
+        approved_item = CourierItem.query.filter_by(
+            courier_id=courier.id,
+            is_received=True
+        ).first()
+        
+        return jsonify({'is_approved': bool(approved_item)})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/courier/<int:courier_id>/item/<int:item_id>/approve', methods=['POST'])
+@login_required
+def approve_courier_item(courier_id, item_id):
+    """Secretary approves receiving a courier item and enters market exchange rate"""
+    try:
+        # Only secretaries can approve
+        if current_user.role != 'Secretary':
+            return jsonify({'success': False, 'message': 'Only secretaries can approve courier items'}), 403
+        
+        item = CourierItem.query.get_or_404(item_id)
+        
+        # Check if already approved
+        if item.is_received:
+            return jsonify({'success': False, 'message': 'Item already approved'}), 400
+        
+        market_rate = request.form.get('market_exchange_rate')
+        if not market_rate:
+            return jsonify({'success': False, 'message': 'Market exchange rate is required'}), 400
+        
+        item.is_received = True
+        item.market_exchange_rate = float(market_rate)
+        item.received_at = datetime.utcnow()
+        item.received_by = current_user.id
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Item approved successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/courier/<int:courier_id>/approve-all', methods=['POST'])
+@login_required
+def approve_all_courier_items(courier_id):
+    """Secretary approves all courier items at once with market exchange rate (only once)"""
+    try:
+        # Only secretaries can approve
+        if current_user.role != 'Secretary':
+            return jsonify({'success': False, 'message': 'Only secretaries can approve courier items'}), 403
+        
+        courier = Courier.query.get_or_404(courier_id)
+        
+        # Check if any items are already approved
+        approved_items = CourierItem.query.filter_by(
+            courier_id=courier.id,
+            is_received=True
+        ).first()
+        
+        if approved_items:
+            return jsonify({'success': False, 'message': 'Items have already been approved. Cannot approve again.'}), 400
+        
+        market_rate = request.form.get('market_exchange_rate')
+        if not market_rate:
+            return jsonify({'success': False, 'message': 'Market exchange rate is required'}), 400
+        
+        # Get all items for this courier
+        all_items = CourierItem.query.filter_by(courier_id=courier.id).all()
+        
+        if not all_items:
+            return jsonify({'success': False, 'message': 'No items found'}), 400
+        
+        # Approve all items
+        approved_count = 0
+        for item in all_items:
+            item.is_received = True
+            item.market_exchange_rate = float(market_rate)
+            item.received_at = datetime.utcnow()
+            item.received_by = current_user.id
+            approved_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Successfully approved {approved_count} item(s)'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():

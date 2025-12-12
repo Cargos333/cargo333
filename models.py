@@ -75,6 +75,45 @@ class ContainerDocument(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
+class Courier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    courier_id = db.Column(db.String(50), unique=True, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    items = db.relationship('CourierItem', backref='courier', lazy=True, cascade='all, delete-orphan')
+
+class CourierItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    courier_id = db.Column(db.Integer, db.ForeignKey('courier.id'), nullable=False)
+    container_number = db.Column(db.String(50), nullable=True)
+    sender_name = db.Column(db.String(100), nullable=False)
+    receiver_name = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    service = db.Column(db.Float, nullable=False)
+    exchange_rate = db.Column(db.Float, nullable=False)  # EURO to AED
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Secretary approval fields
+    is_received = db.Column(db.Boolean, default=False)
+    market_exchange_rate = db.Column(db.Float, nullable=True)  # Market exchange rate at time of receipt
+    received_at = db.Column(db.DateTime, nullable=True)
+    received_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    @property
+    def money_in_euro(self):
+        return self.amount - self.service
+    
+    @property
+    def money_in_aed(self):
+        return self.money_in_euro * self.exchange_rate
+    
+    @property
+    def money_received(self):
+        """Money received based on market exchange rate (only if approved)"""
+        if self.is_received and self.market_exchange_rate:
+            return self.money_in_euro * self.market_exchange_rate
+        return None
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)

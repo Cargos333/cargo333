@@ -3,70 +3,134 @@
 {% block content %}
 <style>
 @media print {
-    /* Hide buttons, navigation, and menu bar when printing */
-    .btn, button, .modal, .no-print, nav, .navbar, header, .sidebar {
+    /* Hide ALL non-content elements - Safari specific */
+    #sidebar-wrapper,
+    #page-content-wrapper > nav,
+    .btn, 
+    button:not(.d-print-none), 
+    .modal, 
+    .no-print, 
+    nav, 
+    .navbar, 
+    header, 
+    .sidebar,
+    .alert,
+    form,
+    a.btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-success,
+    .btn-danger,
+    .btn-warning {
         display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        overflow: hidden !important;
     }
     
-    /* Hide the entire body margin/padding added by base template */
-    body {
-        margin: 0;
-        padding: 0;
+    /* Reset all body and wrapper styles */
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
     }
     
+    #page-content-wrapper {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* Make main content visible and full width */
     .container {
         max-width: 100% !important;
-        padding: 0 !important;
+        padding: 10px !important;
         margin: 0 !important;
+        width: 100% !important;
     }
     
     /* Keep header on same page as content */
-    h1, .card.mb-4:first-of-type {
+    h1 {
+        page-break-after: avoid !important;
+        margin-top: 0 !important;
+        font-size: 18px !important;
+    }
+    
+    .card.mb-4:first-of-type {
         page-break-after: avoid !important;
     }
     
     /* Adjust layout for printing */
     .card {
         border: 1px solid #000 !important;
-        page-break-inside: avoid;
+        page-break-inside: avoid !important;
+        box-shadow: none !important;
+        margin-bottom: 10px !important;
+    }
+    
+    .card-body {
+        padding: 10px !important;
     }
     
     /* Better table printing */
+    .table-responsive {
+        overflow: visible !important;
+        border: none !important;
+    }
+    
     table {
-        page-break-inside: auto;
-        font-size: 10px;
+        page-break-inside: auto !important;
+        font-size: 9px !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    
+    thead {
+        display: table-header-group !important;
     }
     
     tr {
-        page-break-inside: avoid;
-        page-break-after: auto;
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+    }
+    
+    th, td {
+        padding: 4px !important;
+        border: 1px solid #000 !important;
     }
     
     /* Hide Amount and Actions columns when printing */
     table thead th:nth-child(5),
     table tbody td:nth-child(5),
+    table tfoot td:nth-child(5),
     table thead th:last-child,
-    table tbody td:last-child {
+    table tbody td:last-child,
+    table tfoot td:last-child {
         display: none !important;
     }
     
     /* Keep Financial Summary on same page */
-    .card {
+    .card.mt-4 {
+        page-break-before: avoid !important;
         page-break-inside: avoid !important;
     }
     
-    /* Prevent page break before Financial Summary */
-    .card.mt-4 {
-        page-break-before: avoid !important;
+    /* Financial summary adjustments */
+    .d-flex {
+        display: flex !important;
     }
     
-    /* Make table fit page width */
-    .table-responsive {
-        overflow: visible !important;
+    /* Hide any remaining interactive elements */
+    input, select, textarea, .form-control, .form-select {
+        display: none !important;
     }
-    
-    table {
-        width: 100%;
+}
+
+/* Print button - only visible on screen */
+@media screen {
+    .print-only {
+        display: none;
     }
 }
 </style>

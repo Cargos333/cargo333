@@ -2,7 +2,7 @@ services:
   - type: web
     name: cargo-333
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python init_production_db.py
     startCommand: gunicorn app:app
     envVars:
       - key: FLASK_ENV

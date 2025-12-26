@@ -22,7 +22,7 @@ def init_production_database():
             print("Creating default admin user...")
             admin = User(
                 username='admin',
-                password_hash=generate_password_hash('admin123'),  # Change this password!
+                password=generate_password_hash('admin123'),  # Change this password!
                 role='Admin',
                 full_name='System Administrator'
             )

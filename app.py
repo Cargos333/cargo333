@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for, flash, send_file,
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_config import app, db
-from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem
+from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage
 from decorators import admin_required, secretary_required, manager_required
 from utils import format_number
 import pandas as pd
@@ -903,6 +903,251 @@ def delete_employee(id):
     db.session.delete(employee)
     db.session.commit()
     return redirect(url_for('employees'))
+
+@app.route('/finance', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def finance():
+    if request.method == 'POST':
+        try:
+            # Get form data
+            name = request.form.get('name', '').strip()
+            amount = float(request.form.get('amount', 0) or 0)
+            service_charge = float(request.form.get('service_charge', 0) or 0)
+            payment_method = request.form.get('payment_method', 'cash')
+            notes = request.form.get('notes', '').strip()
+            
+            if not name:
+                flash('Name is required', 'danger')
+                return redirect(url_for('finance'))
+            
+            # Create new finance record (ticket)
+            finance_record = FinanceRecord(
+                name=name,
+                amount=amount,
+                service_charge=service_charge,
+                payment_method=payment_method,
+                notes=notes,
+                total_amount=0,  # Will be calculated next
+                added_by=current_user.id
+            )
+            
+            # Calculate and set total
+            finance_record.total_amount = finance_record.calculate_total()
+            
+            db.session.add(finance_record)
+            db.session.commit()
+            
+            flash(f'Ticket added successfully for {name}. Total: €{finance_record.total_amount:.2f}', 'success')
+            return redirect(url_for('finance'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding ticket: {str(e)}', 'danger')
+            return redirect(url_for('finance'))
+    
+    # GET request with optional date filter
+    filter_date = request.args.get('date')
+    
+    if filter_date:
+        try:
+            from datetime import datetime as dt
+            filter_date_obj = dt.strptime(filter_date, '%Y-%m-%d').date()
+            # Filter records for specific date
+            records = FinanceRecord.query.filter(
+                db.func.date(FinanceRecord.created_at) == filter_date_obj
+            ).order_by(FinanceRecord.created_at.desc()).all()
+        except:
+            records = FinanceRecord.query.order_by(FinanceRecord.created_at.desc()).all()
+    else:
+        records = FinanceRecord.query.order_by(FinanceRecord.created_at.desc()).all()
+    
+    # Calculate total sum and count
+    total_sum = sum(record.total_amount for record in records)
+    total_cash = sum(record.total_amount for record in records if record.payment_method == 'cash')
+    ticket_count = len(records)
+    
+    # Create a dictionary to map user IDs to usernames
+    user_dict = {user.id: user.username for user in User.query.all()}
+    
+    return render_template('finance.html', 
+                         records=records, 
+                         total_sum=total_sum,
+                         total_cash=total_cash,
+                         ticket_count=ticket_count, 
+                         user_dict=user_dict,
+                         filter_date=filter_date)
+
+@app.route('/finance/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_finance_record(id):
+    try:
+        record = FinanceRecord.query.get_or_404(id)
+        db.session.delete(record)
+        db.session.commit()
+        flash('Finance record deleted successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting record: {str(e)}', 'danger')
+    
+    return redirect(url_for('finance'))
+
+@app.route('/finance/delete_multiple', methods=['POST'])
+@login_required
+@admin_required
+def delete_multiple_finance_records():
+    try:
+        ticket_ids = request.form.getlist('ticket_ids')
+        
+        if not ticket_ids:
+            flash('No tickets selected for deletion.', 'warning')
+            return redirect(url_for('finance'))
+        
+        # Delete all selected tickets
+        deleted_count = 0
+        for ticket_id in ticket_ids:
+            record = FinanceRecord.query.get(ticket_id)
+            if record:
+                db.session.delete(record)
+                deleted_count += 1
+        
+        db.session.commit()
+        flash(f'Successfully deleted {deleted_count} ticket(s).', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting tickets: {str(e)}', 'danger')
+    
+    return redirect(url_for('finance'))
+
+@app.route('/billetage', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def billetage():
+    if request.method == 'POST':
+        try:
+            # Get form data for bills
+            euro_500 = int(request.form.get('euro_500', 0) or 0)
+            euro_200 = int(request.form.get('euro_200', 0) or 0)
+            euro_100 = int(request.form.get('euro_100', 0) or 0)
+            euro_50 = int(request.form.get('euro_50', 0) or 0)
+            euro_20 = int(request.form.get('euro_20', 0) or 0)
+            euro_10 = int(request.form.get('euro_10', 0) or 0)
+            euro_5 = int(request.form.get('euro_5', 0) or 0)
+            
+            # Get form data for Comores denominations
+            kmf_10000 = int(request.form.get('kmf_10000', 0) or 0)
+            kmf_5000 = int(request.form.get('kmf_5000', 0) or 0)
+            kmf_2000 = int(request.form.get('kmf_2000', 0) or 0)
+            kmf_1000 = int(request.form.get('kmf_1000', 0) or 0)
+            kmf_500 = int(request.form.get('kmf_500', 0) or 0)
+            
+            notes = request.form.get('notes', '').strip()
+            count_date_str = request.form.get('count_date', '')
+            
+            # Parse count date
+            from datetime import datetime as dt
+            if count_date_str:
+                count_date = dt.strptime(count_date_str, '%Y-%m-%d').date()
+            else:
+                count_date = datetime.utcnow().date()
+            
+            # Create new billetage record
+            billetage_record = Billetage(
+                count_date=count_date,
+                euro_500=euro_500,
+                euro_200=euro_200,
+                euro_100=euro_100,
+                euro_50=euro_50,
+                euro_20=euro_20,
+                euro_10=euro_10,
+                euro_5=euro_5,
+                kmf_10000=kmf_10000,
+                kmf_5000=kmf_5000,
+                kmf_2000=kmf_2000,
+                kmf_1000=kmf_1000,
+                kmf_500=kmf_500,
+                notes=notes,
+                total_amount=0,
+                counted_by=current_user.id
+            )
+            
+            # Calculate and set total
+            billetage_record.total_amount = billetage_record.calculate_total()
+            
+            db.session.add(billetage_record)
+            db.session.commit()
+            
+            flash(f'Billetage added successfully. Total: €{billetage_record.total_amount:.2f}', 'success')
+            return redirect(url_for('billetage'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding billetage: {str(e)}', 'danger')
+            return redirect(url_for('billetage'))
+    
+    # GET request with optional date filter
+    filter_date = request.args.get('date')
+    
+    if filter_date:
+        try:
+            from datetime import datetime as dt
+            filter_date_obj = dt.strptime(filter_date, '%Y-%m-%d').date()
+            # Filter billetage for specific date
+            billetage_records = Billetage.query.filter(
+                Billetage.count_date == filter_date_obj
+            ).order_by(Billetage.created_at.desc()).all()
+            
+            # Get tickets for the same date (cash only)
+            tickets = FinanceRecord.query.filter(
+                db.func.date(FinanceRecord.created_at) == filter_date_obj,
+                FinanceRecord.payment_method == 'cash'
+            ).all()
+        except:
+            billetage_records = Billetage.query.order_by(Billetage.created_at.desc()).all()
+            tickets = []
+    else:
+        billetage_records = Billetage.query.order_by(Billetage.created_at.desc()).all()
+        # Get all cash tickets
+        tickets = FinanceRecord.query.filter_by(payment_method='cash').all()
+    
+    # Get total from cash tickets (for the filtered date or all)
+    tickets_total = sum(ticket.total_amount for ticket in tickets)
+    ticket_count = len(tickets)
+    
+    # Get total from billetage
+    billetage_total = sum(record.total_amount for record in billetage_records)
+    
+    # Calculate difference
+    difference = billetage_total - tickets_total
+    
+    # Create a dictionary to map user IDs to usernames
+    user_dict = {user.id: user.username for user in User.query.all()}
+    
+    return render_template('billetage.html', 
+                         billetage_records=billetage_records,
+                         billetage_total=billetage_total,
+                         tickets_total=tickets_total,
+                         ticket_count=ticket_count,
+                         tickets=tickets,
+                         difference=difference,
+                         user_dict=user_dict,
+                         filter_date=filter_date)
+
+@app.route('/billetage/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_billetage(id):
+    try:
+        record = Billetage.query.get_or_404(id)
+        db.session.delete(record)
+        db.session.commit()
+        flash('Billetage deleted successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting billetage: {str(e)}', 'danger')
+    
+    return redirect(url_for('billetage'))
 
 @app.route('/client/<int:id>/products')
 @login_required

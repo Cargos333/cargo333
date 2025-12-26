@@ -114,6 +114,85 @@ class CourierItem(db.Model):
             return self.money_in_euro * self.market_exchange_rate
         return None
 
+class FinanceRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    # Ticketing fields
+    name = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    service_charge = db.Column(db.Float, nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    # Payment tracking
+    is_paid = db.Column(db.Boolean, default=True)  # Assume tickets are paid when created
+    payment_method = db.Column(db.String(50), default='cash')  # cash, card, transfer, etc.
+    # Notes/Description
+    notes = db.Column(db.Text)
+    # User who added the record
+    added_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def calculate_total(self):
+        """Calculate total amount (amount - service charge)"""
+        return (self.amount or 0) - (self.service_charge or 0)
+
+class Billetage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    # Date for which this cash count is valid (for filtering related tickets)
+    count_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    # Bill denominations
+    euro_500 = db.Column(db.Integer, default=0)
+    euro_200 = db.Column(db.Integer, default=0)
+    euro_100 = db.Column(db.Integer, default=0)
+    euro_50 = db.Column(db.Integer, default=0)
+    euro_20 = db.Column(db.Integer, default=0)
+    euro_10 = db.Column(db.Integer, default=0)
+    euro_5 = db.Column(db.Integer, default=0)
+    # Comores denominations (KMF)
+    kmf_10000 = db.Column(db.Integer, default=0)
+    kmf_5000 = db.Column(db.Integer, default=0)
+    kmf_2000 = db.Column(db.Integer, default=0)
+    kmf_1000 = db.Column(db.Integer, default=0)
+    kmf_500 = db.Column(db.Integer, default=0)
+    # Total
+    total_amount = db.Column(db.Float, nullable=False)
+    # Reconciliation status
+    is_reconciled = db.Column(db.Boolean, default=False)
+    reconciliation_notes = db.Column(db.Text)
+    # Notes
+    notes = db.Column(db.Text)
+    # User who counted
+    counted_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def calculate_total(self):
+        """Calculate total amount from all denominations"""
+        # EUR to KMF exchange rate (approximate: 1 EUR = 492 KMF)
+        EUR_TO_KMF = 492
+        
+        bills_total_eur = (
+            (self.euro_500 or 0) * 500 +
+            (self.euro_200 or 0) * 200 +
+            (self.euro_100 or 0) * 100 +
+            (self.euro_50 or 0) * 50 +
+            (self.euro_20 or 0) * 20 +
+            (self.euro_10 or 0) * 10 +
+            (self.euro_5 or 0) * 5
+        )
+        
+        kmf_total = (
+            (self.kmf_10000 or 0) * 10000 +
+            (self.kmf_5000 or 0) * 5000 +
+            (self.kmf_2000 or 0) * 2000 +
+            (self.kmf_1000 or 0) * 1000 +
+            (self.kmf_500 or 0) * 500
+        )
+        
+        # Convert KMF to EUR for total
+        kmf_in_eur = kmf_total / EUR_TO_KMF
+        
+        return bills_total_eur + kmf_in_eur
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)

@@ -162,6 +162,12 @@
                     <a href="{{ url_for('history') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('history') else '' }}">
                         <i class="fas fa-history"></i> History
                     </a>
+                    <a href="{{ url_for('finance') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('finance') else '' }}">
+                        <i class="fas fa-euro-sign"></i> Finance
+                    </a>
+                    <a href="{{ url_for('billetage') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('billetage') else '' }}">
+                        <i class="fas fa-coins"></i> Billetage
+                    </a>
                     <a href="{{ url_for('employees') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('employees') else '' }}">
                         <i class="fas fa-users"></i> Employees
                     </a>

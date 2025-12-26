@@ -1,0 +1,653 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Billetage - Cash Counting</h1>
+    
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6><i class="fas fa-ticket-alt"></i> Tickets Total</h6>
+                    <h3>€{{ "%.2f"|format(tickets_total) }}</h3>
+                    <small>{{ ticket_count }} tickets</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6><i class="fas fa-money-bill-wave"></i> Cash Counted</h6>
+                    <h3>€{{ "%.2f"|format(billetage_total) }}</h3>
+                    <small>Physical money</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card {% if difference >= 0 %}bg-info{% else %}bg-warning{% endif %} text-white">
+                <div class="card-body">
+                    <h6><i class="fas fa-balance-scale"></i> Difference</h6>
+                    <h3>€{{ "%.2f"|format(difference|abs) }}</h3>
+                    <small>{% if difference >= 0 %}Surplus{% else %}Shortage{% endif %}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <h6><i class="fas fa-calculator"></i> Status</h6>
+                    <h3>
+                        {% if difference == 0 %}
+                            <i class="fas fa-check-circle"></i>
+                        {% elif difference > 0 %}
+                            <i class="fas fa-arrow-up"></i>
+                        {% else %}
+                            <i class="fas fa-arrow-down"></i>
+                        {% endif %}
+                    </h3>
+                    <small>{% if difference == 0 %}Balanced{% elif difference > 0 %}Over{% else %}Under{% endif %}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Date Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('billetage') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="date" class="form-label">Filter by Date</label>
+                    <input type="date" class="form-control" id="date" name="date" value="{{ filter_date or '' }}">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                    <a href="{{ url_for('billetage') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Related Tickets -->
+    {% if tickets %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-ticket-alt"></i> Related Cash Tickets {% if filter_date %}({{ filter_date }}){% endif %}</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Name</th>
+                            <th>Amount</th>
+                            <th>Service</th>
+                            <th>Total</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in tickets %}
+                        <tr>
+                            <td>{{ ticket.created_at.strftime('%H:%M') }}</td>
+                            <td>{{ ticket.name }}</td>
+                            <td>€{{ "%.2f"|format(ticket.amount) }}</td>
+                            <td>€{{ "%.2f"|format(ticket.service_charge) }}</td>
+                            <td><strong>€{{ "%.2f"|format(ticket.total_amount) }}</strong></td>
+                            <td>
+                                {% if ticket.notes %}
+                                    <small>{{ ticket.notes }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="4" class="text-end">Total:</th>
+                            <th>€{{ "%.2f"|format(tickets_total) }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Add Billetage Form -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-coins"></i> Count Cash</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('billetage') }}">
+                <div class="row">
+                    <!-- Bills -->
+                    <div class="col-md-6">
+                        <h6 class="mb-3 text-primary"><i class="fas fa-money-bill"></i> Bills (Billets)</h6>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_500" class="form-label">500€</label>
+                                <input type="number" class="form-control" id="euro_500" name="euro_500" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_500">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_200" class="form-label">200€</label>
+                                <input type="number" class="form-control" id="euro_200" name="euro_200" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_200">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_100" class="form-label">100€</label>
+                                <input type="number" class="form-control" id="euro_100" name="euro_100" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_100">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_50" class="form-label">50€</label>
+                                <input type="number" class="form-control" id="euro_50" name="euro_50" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_50">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_20" class="form-label">20€</label>
+                                <input type="number" class="form-control" id="euro_20" name="euro_20" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_20">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_10" class="form-label">10€</label>
+                                <input type="number" class="form-control" id="euro_10" name="euro_10" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_10">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="euro_5" class="form-label">5€</label>
+                                <input type="number" class="form-control" id="euro_5" name="euro_5" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-secondary p-2 mt-4">
+                                    <small>= €<span id="total_5">0.00</span></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comores (KMF) -->
+                    <div class="col-md-6">
+                        <h6 class="mb-3 text-warning"><i class="fas fa-money-bill"></i> Comores (KMF)</h6>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="kmf_10000" class="form-label">10,000 KMF</label>
+                                <input type="number" class="form-control" id="kmf_10000" name="kmf_10000" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning p-2 mt-4">
+                                    <small>= <span id="total_kmf10000">0</span> KMF</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="kmf_5000" class="form-label">5,000 KMF</label>
+                                <input type="number" class="form-control" id="kmf_5000" name="kmf_5000" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning p-2 mt-4">
+                                    <small>= <span id="total_kmf5000">0</span> KMF</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="kmf_2000" class="form-label">2,000 KMF</label>
+                                <input type="number" class="form-control" id="kmf_2000" name="kmf_2000" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning p-2 mt-4">
+                                    <small>= <span id="total_kmf2000">0</span> KMF</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="kmf_1000" class="form-label">1,000 KMF</label>
+                                <input type="number" class="form-control" id="kmf_1000" name="kmf_1000" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning p-2 mt-4">
+                                    <small>= <span id="total_kmf1000">0</span> KMF</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label for="kmf_500" class="form-label">500 KMF</label>
+                                <input type="number" class="form-control" id="kmf_500" name="kmf_500" 
+                                       min="0" value="0" placeholder="Count">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning p-2 mt-4">
+                                    <small>= <span id="total_kmf500">0</span> KMF</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="count_date" class="form-label">Count Date</label>
+                            <input type="date" class="form-control" id="count_date" name="count_date" 
+                                   value="{{ filter_date or '' }}" required>
+                            <small class="text-muted">Date for which this cash count applies</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="2" 
+                                      placeholder="Optional notes"></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="alert alert-primary">
+                            <strong><i class="fas fa-euro-sign"></i> EUR Total:</strong> €<span id="eur_total">0.00</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-warning">
+                            <strong><i class="fas fa-coins"></i> KMF Total:</strong> <span id="kmf_total">0</span> KMF
+                            <br><small class="text-muted">(= €<span id="kmf_to_eur">0.00</span>)</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-success">
+                    <strong><i class="fas fa-calculator"></i> Grand Total:</strong> €<span id="grand_total">0.00</span>
+                </div>
+                
+                <!-- Balance Comparison -->
+                <div class="alert alert-info border-3">
+                    <h5 class="mb-3"><i class="fas fa-balance-scale"></i> Balance</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Tickets Total:</strong><br>
+                            <span class="fs-5">€{{ "%.2f"|format(tickets_total) }}</span><br>
+                            <small class="text-muted">{{ "%.0f"|format(tickets_total * 492) }} KMF</small>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Billetage Total:</strong><br>
+                            <span class="fs-5 text-success">€<span id="grand_total_display">0.00</span></span><br>
+                            <small class="text-muted"><span id="grand_total_kmf">0</span> KMF</small>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Difference:</strong><br>
+                            <span class="fs-5 {% if difference >= 0 %}text-info{% else %}text-warning{% endif %}" id="balance_diff">
+                                €0.00
+                            </span><br>
+                            <small class="text-muted"><span id="balance_diff_kmf">0</span> KMF</small><br>
+                            <small class="d-block" id="balance_status">-</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-end">
+                    <button type="reset" class="btn btn-secondary" onclick="updateAllTotals()">Reset</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Billetage
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Billetage History -->
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="fas fa-history"></i> Billetage History</h5>
+        </div>
+        <div class="card-body">
+            {% if billetage_records %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Date</th>
+                            <th>EUR Total</th>
+                            <th>KMF Total</th>
+                            <th>Grand Total</th>
+                            <th>Notes</th>
+                            <th>Counted By</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in billetage_records %}
+                        <tr>
+                            <td>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                €{{ "%.2f"|format((record.euro_500 * 500) + (record.euro_200 * 200) + (record.euro_100 * 100) + (record.euro_50 * 50) + (record.euro_20 * 20) + (record.euro_10 * 10) + (record.euro_5 * 5)) }}
+                            </td>
+                            <td>
+                                {{ "{:,.0f}".format((record.kmf_10000 or 0) * 10000 + (record.kmf_5000 or 0) * 5000 + (record.kmf_2000 or 0) * 2000 + (record.kmf_1000 or 0) * 1000 + (record.kmf_500 or 0) * 500) }} KMF
+                                <br><small class="text-muted">(€{{ "%.2f"|format(((record.kmf_10000 or 0) * 10000 + (record.kmf_5000 or 0) * 5000 + (record.kmf_2000 or 0) * 2000 + (record.kmf_1000 or 0) * 1000 + (record.kmf_500 or 0) * 500) / 492.0) }})</small>
+                            </td>
+                            <td><strong class="text-success">€{{ "%.2f"|format(record.total_amount) }}</strong></td>
+                            <td>
+                                {% if record.notes %}
+                                    <small>{{ record.notes[:30] }}{% if record.notes|length > 30 %}...{% endif %}</small>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td><small>{{ user_dict.get(record.counted_by, 'N/A') }}</small></td>
+                            <td>
+                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#detailsModal{{ record.id }}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('delete_billetage', id=record.id) }}" 
+                                      style="display: inline;" 
+                                      onsubmit="return confirm('Are you sure you want to delete this billetage?');">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Details Modals -->
+            {% for record in billetage_records %}
+                        <div class="modal fade" id="detailsModal{{ record.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-info text-white">
+                                        <h5 class="modal-title">Billetage Details - {{ record.count_date.strftime('%Y-%m-%d') }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6 class="text-primary">Bills (Billets)</h6>
+                                                <table class="table table-sm">
+                                                    <tr>
+                                                        <td>500€</td>
+                                                        <td>{{ record.euro_500 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_500 * 500) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>200€</td>
+                                                        <td>{{ record.euro_200 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_200 * 200) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>100€</td>
+                                                        <td>{{ record.euro_100 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_100 * 100) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>50€</td>
+                                                        <td>{{ record.euro_50 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_50 * 50) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>20€</td>
+                                                        <td>{{ record.euro_20 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_20 * 20) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>10€</td>
+                                                        <td>{{ record.euro_10 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_10 * 10) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>5€</td>
+                                                        <td>{{ record.euro_5 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format(record.euro_5 * 5) }}</td>
+                                                    </tr>
+                                                    <tr class="table-info">
+                                                        <th>Bills Total</th>
+                                                        <th></th>
+                                                        <th class="text-end">€{{ "%.2f"|format((record.euro_500 * 500) + (record.euro_200 * 200) + (record.euro_100 * 100) + (record.euro_50 * 50) + (record.euro_20 * 20) + (record.euro_10 * 10) + (record.euro_5 * 5)) }}</th>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="text-warning">Comores (KMF)</h6>
+                                                <table class="table table-sm">
+                                                    <tr>
+                                                        <td>10,000 KMF</td>
+                                                        <td>{{ record.kmf_10000 or 0 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format((record.kmf_10000 or 0) * 10000 / 492.0) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>5,000 KMF</td>
+                                                        <td>{{ record.kmf_5000 or 0 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format((record.kmf_5000 or 0) * 5000 / 492.0) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>2,000 KMF</td>
+                                                        <td>{{ record.kmf_2000 or 0 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format((record.kmf_2000 or 0) * 2000 / 492.0) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>1,000 KMF</td>
+                                                        <td>{{ record.kmf_1000 or 0 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format((record.kmf_1000 or 0) * 1000 / 492.0) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>500 KMF</td>
+                                                        <td>{{ record.kmf_500 or 0 }}</td>
+                                                        <td class="text-end">€{{ "%.2f"|format((record.kmf_500 or 0) * 500 / 492.0) }}</td>
+                                                    </tr>
+                                                    <tr class="table-warning">
+                                                        <th>KMF Total</th>
+                                                        <th></th>
+                                                        <th class="text-end">€{{ "%.2f"|format(((record.kmf_10000 or 0) * 10000 + (record.kmf_5000 or 0) * 5000 + (record.kmf_2000 or 0) * 2000 + (record.kmf_1000 or 0) * 1000 + (record.kmf_500 or 0) * 500) / 492.0) }}</th>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <hr>
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <table class="table">
+                                                    <tr class="table-success">
+                                                        <th>Grand Total</th>
+                                                        <th class="text-end"><h4>€{{ "%.2f"|format(record.total_amount) }}</h4></th>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        {% if record.notes %}
+                                        <div class="alert alert-secondary">
+                                            <strong>Notes:</strong> {{ record.notes }}
+                                        </div>
+                                        {% endif %}
+                                        <div class="text-muted">
+                                            <small>
+                                                <i class="fas fa-user"></i> Counted by: {{ user_dict.get(record.counted_by, 'N/A') }}<br>
+                                                <i class="fas fa-clock"></i> Created: {{ record.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No billetage records yet. Start counting cash using the form above.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for live calculations -->
+<script>
+    const eurDenominations = [
+        {id: 'euro_500', value: 500, totalId: 'total_500'},
+        {id: 'euro_200', value: 200, totalId: 'total_200'},
+        {id: 'euro_100', value: 100, totalId: 'total_100'},
+        {id: 'euro_50', value: 50, totalId: 'total_50'},
+        {id: 'euro_20', value: 20, totalId: 'total_20'},
+        {id: 'euro_10', value: 10, totalId: 'total_10'},
+        {id: 'euro_5', value: 5, totalId: 'total_5'}
+    ];
+    
+    const kmfDenominations = [
+        {id: 'kmf_10000', value: 10000, totalId: 'total_kmf10000'},
+        {id: 'kmf_5000', value: 5000, totalId: 'total_kmf5000'},
+        {id: 'kmf_2000', value: 2000, totalId: 'total_kmf2000'},
+        {id: 'kmf_1000', value: 1000, totalId: 'total_kmf1000'},
+        {id: 'kmf_500', value: 500, totalId: 'total_kmf500'}
+    ];
+    
+    const EUR_TO_KMF = 492;
+    const TICKETS_TOTAL = {{ tickets_total }};
+    
+    function updateAllTotals() {
+        let eurTotal = 0;
+        let kmfTotal = 0;
+        
+        // Calculate EUR bills total
+        eurDenominations.forEach(denom => {
+            const count = parseInt(document.getElementById(denom.id).value) || 0;
+            const total = count * denom.value;
+            document.getElementById(denom.totalId).textContent = total.toFixed(2);
+            eurTotal += total;
+        });
+        
+        // Calculate KMF total (in KMF)
+        kmfDenominations.forEach(denom => {
+            const count = parseInt(document.getElementById(denom.id).value) || 0;
+            const total = count * denom.value;
+            document.getElementById(denom.totalId).textContent = total.toLocaleString('fr-FR');
+            kmfTotal += total;
+        });
+        
+        // Display totals
+        document.getElementById('eur_total').textContent = eurTotal.toFixed(2);
+        document.getElementById('kmf_total').textContent = kmfTotal.toLocaleString('fr-FR');
+        
+        // Convert KMF to EUR
+        const kmfToEur = kmfTotal / EUR_TO_KMF;
+        document.getElementById('kmf_to_eur').textContent = kmfToEur.toFixed(2);
+        
+        // Grand total in EUR
+        const grandTotal = eurTotal + kmfToEur;
+        document.getElementById('grand_total').textContent = grandTotal.toFixed(2);
+        document.getElementById('grand_total_display').textContent = grandTotal.toFixed(2);
+        
+        // Grand total in KMF (convert EUR back to KMF and add)
+        const grandTotalKMF = (eurTotal * EUR_TO_KMF) + kmfTotal;
+        document.getElementById('grand_total_kmf').textContent = grandTotalKMF.toLocaleString('fr-FR');
+        
+        // Calculate balance
+        const difference = grandTotal - TICKETS_TOTAL;
+        const differenceKMF = difference * EUR_TO_KMF;
+        const diffElement = document.getElementById('balance_diff');
+        const diffKmfElement = document.getElementById('balance_diff_kmf');
+        const statusElement = document.getElementById('balance_status');
+        
+        if (difference >= 0) {
+            diffElement.textContent = '€' + difference.toFixed(2);
+            diffElement.className = 'fs-5 text-info';
+            diffKmfElement.textContent = differenceKMF.toLocaleString('fr-FR', {maximumFractionDigits: 0});
+            statusElement.textContent = difference === 0 ? 'Balanced ✓' : 'Surplus +';
+            statusElement.className = 'd-block text-info';
+        } else {
+            diffElement.textContent = '€' + Math.abs(difference).toFixed(2);
+            diffElement.className = 'fs-5 text-warning';
+            diffKmfElement.textContent = Math.abs(differenceKMF).toLocaleString('fr-FR', {maximumFractionDigits: 0});
+            statusElement.textContent = 'Shortage -';
+            statusElement.className = 'd-block text-warning';
+        }
+    }
+    
+    // Add event listeners
+    eurDenominations.forEach(denom => {
+        document.getElementById(denom.id).addEventListener('input', updateAllTotals);
+    });
+    
+    kmfDenominations.forEach(denom => {
+        document.getElementById(denom.id).addEventListener('input', updateAllTotals);
+    });
+    
+    // Initialize
+    updateAllTotals();
+</script>
+
+{% endblock %}

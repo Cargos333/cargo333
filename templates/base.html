@@ -15,6 +15,8 @@
     <style>
         body {
             overflow-x: hidden;
+            margin: 0;
+            padding: 0;
         }
         
         #page-content-wrapper {
@@ -27,12 +29,14 @@
             min-height: 100vh;
             margin-left: -15rem;
             width: 15rem;
-            transition: margin 0.3s;
+            transition: margin 0.3s, box-shadow 0.3s;
             position: fixed;
-            z-index: 1;
+            z-index: 1040;
             background-color: #212529;
             left: 0;
             top: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
         
         #sidebar-wrapper .sidebar-heading {
@@ -44,6 +48,7 @@
         
         #sidebar-wrapper .list-group {
             width: 15rem;
+            padding-bottom: 100px;
         }
         
         .list-group-item {
@@ -51,6 +56,9 @@
             background-color: transparent;
             color: rgba(255, 255, 255, 0.75);
             padding: 0.7rem 1.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .list-group-item:hover, .list-group-item.active {
@@ -116,10 +124,46 @@
         .mobile-top-bar {
             background-color: #212529;
             color: white;
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 1rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+        }
+        
+        .mobile-top-bar .btn {
+            padding: 0.5rem 0.75rem;
+        }
+        
+        .mobile-top-bar span {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        /* Overlay for mobile sidebar */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1039;
+            display: none;
+            transition: opacity 0.3s;
+        }
+        
+        .sidebar-overlay.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
         @media (min-width: 768px) {
@@ -149,23 +193,48 @@
         @media (max-width: 767px) {
             #sidebar-wrapper {
                 margin-left: -15rem;
+                box-shadow: none;
             }
             
             #page-content-wrapper {
                 margin-left: 0;
+                min-width: 100%;
             }
             
             #wrapper.toggled #sidebar-wrapper {
                 margin-left: 0;
+                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.4);
             }
             
             #wrapper.toggled #page-content-wrapper {
                 margin-left: 0;
             }
+            
+            .container-fluid {
+                padding: 1rem !important;
+            }
+            
+            /* Make tables responsive on mobile */
+            .table-responsive {
+                font-size: 0.875rem;
+            }
+            
+            /* Adjust logout button for mobile */
+            .sidebar-bottom {
+                padding: 0.75rem;
+            }
+            
+            .logout-button {
+                padding: 0.65rem 1rem;
+                font-size: 0.95rem;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Overlay for mobile sidebar -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    
     <div class="d-flex" id="wrapper">
         <!-- Sidebar -->
         <div id="sidebar-wrapper">
@@ -247,25 +316,57 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById("menu-toggle").addEventListener("click", function(e) {
-            e.preventDefault();
-            document.getElementById("wrapper").classList.toggle("toggled");
-        });
+        const wrapper = document.getElementById('wrapper');
+        const overlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar-wrapper');
         
-        // Close sidebar when clicking outside of it (for mobile)
-        document.addEventListener('click', function(event) {
-            const sidebar = document.getElementById('sidebar-wrapper');
-            const menuToggle = document.getElementById('menu-toggle');
-            const wrapper = document.getElementById('wrapper');
+        // Toggle sidebar and overlay
+        menuToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            wrapper.classList.toggle('toggled');
             
-            // Check if sidebar is open and viewport is mobile-sized
-            if (window.innerWidth < 768 && wrapper.classList.contains('toggled')) {
-                // Check if click is outside the sidebar and not on the menu toggle button
-                if (!sidebar.contains(event.target) && event.target !== menuToggle && !menuToggle.contains(event.target)) {
-                    wrapper.classList.remove('toggled');
+            if (window.innerWidth < 768) {
+                overlay.classList.toggle('active');
+                // Prevent body scroll when sidebar is open
+                if (wrapper.classList.contains('toggled')) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
                 }
             }
-        }, true);
+        });
+        
+        // Close sidebar when clicking overlay
+        overlay.addEventListener('click', function() {
+            wrapper.classList.remove('toggled');
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+        
+        // Close sidebar when clicking a link (mobile only)
+        if (sidebar) {
+            const sidebarLinks = sidebar.querySelectorAll('.list-group-item');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth < 768) {
+                        setTimeout(() => {
+                            wrapper.classList.remove('toggled');
+                            overlay.classList.remove('active');
+                            document.body.style.overflow = '';
+                        }, 200);
+                    }
+                });
+            });
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 768) {
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
     </script>
 </body>
 </html>

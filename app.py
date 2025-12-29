@@ -1582,8 +1582,9 @@ def upload_excel(id):
     return redirect(url_for('container_details', id=id))
 
 @app.route('/download-products-template')
+@app.route('/download-products-template/<int:client_id>')
 @login_required
-def download_products_template():
+def download_products_template(client_id=None):
     output = io.BytesIO()
     df = pd.DataFrame({
         'Reference': ['REF001', 'REF002'],
@@ -1599,16 +1600,28 @@ def download_products_template():
         df.to_excel(writer, index=False)
     
     output.seek(0)
+    
+    # Determine the filename based on client_id
+    if client_id:
+        client = db.session.get(Client, client_id)
+        if client:
+            download_name = f"{client.mark}_products_template.xlsx"
+        else:
+            download_name = 'products_template.xlsx'
+    else:
+        download_name = 'products_template.xlsx'
+    
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name='products_template.xlsx'
+        download_name=download_name
     )
 
 @app.route('/download-products-csv-template')
+@app.route('/download-products-csv-template/<int:client_id>')
 @login_required
-def download_products_csv_template():
+def download_products_csv_template(client_id=None):
     output = io.StringIO()
     df = pd.DataFrame({
         'Reference': ['REF001', 'REF002'],
@@ -1622,11 +1635,21 @@ def download_products_csv_template():
     df.to_csv(output, index=False)
     output.seek(0)
     
+    # Determine the filename based on client_id
+    if client_id:
+        client = db.session.get(Client, client_id)
+        if client:
+            download_name = f"{client.mark}_products_template.csv"
+        else:
+            download_name = 'products_template.csv'
+    else:
+        download_name = 'products_template.csv'
+    
     return send_file(
         io.BytesIO(output.getvalue().encode('utf-8')),
         mimetype='text/csv',
         as_attachment=True,
-        download_name='products_template.csv'
+        download_name=download_name
     )
 
 @app.route('/client/<int:id>/upload-products', methods=['POST'])

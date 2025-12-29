@@ -41,19 +41,24 @@
                 <div class="row align-items-end">
                     <div class="col-md-8">
                         <label for="excel_file" class="form-label">
-                            Upload Excel File 
+                            Upload Products File 
                             <a href="{{ url_for('download_products_template') }}" class="btn btn-link btn-sm">
-                                Download Template
+                                <i class="fas fa-file-excel"></i> Excel Template
+                            </a>
+                            <a href="{{ url_for('download_products_csv_template') }}" class="btn btn-link btn-sm">
+                                <i class="fas fa-file-csv"></i> CSV Template
                             </a>
                         </label>
                         <input type="file" class="form-control" id="excel_file" name="file" 
-                               accept=".xlsx" required>
+                               accept=".xlsx,.xls,.csv,text/csv,application/csv,text/comma-separated-values,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
                         <small class="form-text text-muted">
-                            Excel file should have columns: Reference, Quantity, Length (m), Width (m), Height (m), Goods Type, Volume Used
+                            <strong>Supported formats:</strong> Excel (.xlsx, .xls) or CSV (.csv)
+                            <br>
+                            <strong>Required columns:</strong> Reference, Quantity, Length (m), Width (m), Height (m), Goods Type, Volume Used
                         </small>
                     </div>
                     <div class="col-md-4">
-                        <button type="submit" class="btn btn-success">Upload Products</button>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-upload"></i> Upload Products</button>
                     </div>
                 </div>
             </form>

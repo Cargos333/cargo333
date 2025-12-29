@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container">
-    <h1>Container #{{ container.container_number }} Details</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Container #{{ container.container_number }} Details</h1>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
     <!-- App config: expose server-side constants safely via data- attributes -->
     <div id="app-config" data-tonne-to-m3="{{ container_tonne_to_m3 }}" data-container-price="{{ container.price }}" data-container-volume="{{ container.total_volume }}" style="display:none"></div>
     <!-- Server-side values exposed safely to JS via data- attributes -->
@@ -196,21 +201,26 @@
                 {% endif %}
             {% endwith %}
             
-            <!-- Excel Upload Form -->
+            <!-- File Upload Form -->
             <form action="{{ url_for('upload_excel', id=container.id) }}" method="POST" 
                   enctype="multipart/form-data" class="mb-4">
                 <div class="row align-items-end">
                     <div class="col-md-8">
                         <label for="excel_file" class="form-label">
-                            Upload Excel File 
+                            Upload Client Data File 
                             <a href="{{ url_for('download_template') }}" class="btn btn-link btn-sm">
-                                Download Template
+                                <i class="fas fa-file-excel"></i> Excel Template
+                            </a>
+                            <a href="{{ url_for('download_csv_template') }}" class="btn btn-link btn-sm">
+                                <i class="fas fa-file-csv"></i> CSV Template
                             </a>
                         </label>
                         <input type="file" class="form-control" id="excel_file" name="file" 
-                               accept=".xlsx" required>
+                               accept=".xlsx,.xls,.csv,text/csv,application/csv,text/comma-separated-values,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
                         <small class="form-text text-muted">
-                            Excel file should have columns: Client Mark, Client Name, Phone, Goods Type, Volume, Volume Used, Tonnage, Price / Tonne
+                            <strong>Supported formats:</strong> Excel (.xlsx, .xls) or CSV (.csv)
+                            <br>
+                            <strong>Required columns:</strong> Client Mark, Client Name, Phone, Goods Type, Volume, Volume Used, Tonnage, Price / Tonne
                             <br>
                             - Goods Type: one of Merchandise, Car, Metals
                             <br>
@@ -218,7 +228,9 @@
                         </small>
                     </div>
                     <div class="col-md-4">
-                        <button type="submit" class="btn btn-success">Upload and Process</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-upload"></i> Upload and Process
+                        </button>
                     </div>
                 </div>
             </form>

@@ -1423,6 +1423,30 @@ def download_template():
         download_name='clients_template.xlsx'
     )
 
+@app.route('/download-csv-template')
+@login_required
+def download_csv_template():
+    output = io.StringIO()
+    df = pd.DataFrame({
+        'Client Mark': ['MARK001', 'MARK002'],
+        'Client Name': ['Example Name 1', 'Example Name 2'],
+        'Phone': ['1234567890', '0987654321'],
+        'Goods Type': ['Merchandise', 'Metals'],
+        'Volume': [10.5, ''],
+        'Volume Used': ['', ''],
+        'Tonnage': ['', 2.5],
+        'Price / Tonne': ['', 120.0]
+    })
+    df.to_csv(output, index=False)
+    output.seek(0)
+    
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='clients_template.csv'
+    )
+
 @app.route('/container/<int:id>/upload-excel', methods=['POST'])
 @login_required
 def upload_excel(id):
@@ -1437,12 +1461,25 @@ def upload_excel(id):
             flash('No file selected')
             return redirect(url_for('container_details', id=id))
         
-        if not file.filename.endswith('.xlsx'):
-            flash('Please upload an Excel file (.xlsx)')
+        # Get file extension
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        # Process based on file type
+        if file_extension in ['xlsx', 'xls']:
+            # Read Excel file with phone column as string
+            df = pd.read_excel(file, dtype={'Phone': str})
+            
+        elif file_extension == 'csv':
+            # Read CSV file with phone column as string
+            df = pd.read_csv(file, dtype={'Phone': str})
+            
+        else:
+            flash('Unsupported file format. Please upload Excel (.xlsx, .xls) or CSV (.csv) files.')
             return redirect(url_for('container_details', id=id))
         
-        # Read Excel file with phone column as string
-        df = pd.read_excel(file, dtype={'Phone': str})
+        if df is None or df.empty:
+            flash('No data found in the uploaded file')
+            return redirect(url_for('container_details', id=id))
 
         # Process each row
         for _, row in df.iterrows():
@@ -1569,6 +1606,29 @@ def download_products_template():
         download_name='products_template.xlsx'
     )
 
+@app.route('/download-products-csv-template')
+@login_required
+def download_products_csv_template():
+    output = io.StringIO()
+    df = pd.DataFrame({
+        'Reference': ['REF001', 'REF002'],
+        'Quantity': [5, 10],
+        'Length (m)': [1.5, 2.0],
+        'Width (m)': [0.8, 1.0],
+        'Height (m)': [0.5, 0.7],
+        'Goods Type': ['Merchandise', 'Car'],
+        'Volume Used': ['', '']
+    })
+    df.to_csv(output, index=False)
+    output.seek(0)
+    
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='products_template.csv'
+    )
+
 @app.route('/client/<int:id>/upload-products', methods=['POST'])
 @login_required
 def upload_products(id):
@@ -1583,12 +1643,19 @@ def upload_products(id):
             flash('No file selected')
             return redirect(url_for('client_products', id=id))
         
-        if not file.filename.endswith('.xlsx'):
-            flash('Please upload an Excel file (.xlsx)')
-            return redirect(url_for('client_products', id=id))
+        # Get file extension
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
         
-        # Read Excel file
-        df = pd.read_excel(file)
+        # Process based on file type
+        if file_extension in ['xlsx', 'xls']:
+            # Read Excel file
+            df = pd.read_excel(file)
+        elif file_extension == 'csv':
+            # Read CSV file
+            df = pd.read_csv(file)
+        else:
+            flash('Unsupported file format. Please upload Excel (.xlsx, .xls) or CSV (.csv) files.')
+            return redirect(url_for('client_products', id=id))
         
         # Define column mappings (English -> Application fields)
         column_mappings = {

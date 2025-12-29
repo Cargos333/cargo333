@@ -42,10 +42,10 @@
                     <div class="col-md-8">
                         <label for="excel_file" class="form-label">
                             Upload Products File 
-                            <a href="{{ url_for('download_products_template') }}" class="btn btn-link btn-sm">
+                            <a href="{{ url_for('download_products_template', client_id=client.id) }}" class="btn btn-link btn-sm">
                                 <i class="fas fa-file-excel"></i> Excel Template
                             </a>
-                            <a href="{{ url_for('download_products_csv_template') }}" class="btn btn-link btn-sm">
+                            <a href="{{ url_for('download_products_csv_template', client_id=client.id) }}" class="btn btn-link btn-sm">
                                 <i class="fas fa-file-csv"></i> CSV Template
                             </a>
                         </label>

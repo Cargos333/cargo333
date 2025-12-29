@@ -410,6 +410,9 @@
                                 <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#detailsModal{{ record.id }}">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ record.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
                                 <form method="POST" action="{{ url_for('delete_billetage', id=record.id) }}" 
                                       style="display: inline;" 
                                       onsubmit="return confirm('Are you sure you want to delete this billetage?');">
@@ -545,6 +548,243 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Edit Modal -->
+                        <div class="modal fade" id="editModal{{ record.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-xl">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-warning text-dark">
+                                        <h5 class="modal-title">Edit Billetage - {{ record.count_date.strftime('%Y-%m-%d') }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="POST" action="{{ url_for('edit_billetage', id=record.id) }}" id="editForm{{ record.id }}">
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <!-- Bills -->
+                                                <div class="col-md-6">
+                                                    <h6 class="mb-3 text-primary"><i class="fas fa-money-bill"></i> Bills (Billets)</h6>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">500€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_500" min="0" value="{{ record.euro_500 }}" 
+                                                                   data-value="500" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-500-{{ record.id }}">{{ "%.2f"|format(record.euro_500 * 500) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">200€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_200" min="0" value="{{ record.euro_200 }}" 
+                                                                   data-value="200" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-200-{{ record.id }}">{{ "%.2f"|format(record.euro_200 * 200) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">100€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_100" min="0" value="{{ record.euro_100 }}" 
+                                                                   data-value="100" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-100-{{ record.id }}">{{ "%.2f"|format(record.euro_100 * 100) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">50€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_50" min="0" value="{{ record.euro_50 }}" 
+                                                                   data-value="50" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-50-{{ record.id }}">{{ "%.2f"|format(record.euro_50 * 50) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">20€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_20" min="0" value="{{ record.euro_20 }}" 
+                                                                   data-value="20" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-20-{{ record.id }}">{{ "%.2f"|format(record.euro_20 * 20) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">10€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_10" min="0" value="{{ record.euro_10 }}" 
+                                                                   data-value="10" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-10-{{ record.id }}">{{ "%.2f"|format(record.euro_10 * 10) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">5€</label>
+                                                            <input type="number" class="form-control edit-eur" 
+                                                                   name="euro_5" min="0" value="{{ record.euro_5 }}" 
+                                                                   data-value="5" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-secondary p-2 mt-4">
+                                                                <small>= €<span class="edit-total-5-{{ record.id }}">{{ "%.2f"|format(record.euro_5 * 5) }}</span></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Comores (KMF) -->
+                                                <div class="col-md-6">
+                                                    <h6 class="mb-3 text-warning"><i class="fas fa-money-bill"></i> Comores (KMF)</h6>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">10,000 KMF</label>
+                                                            <input type="number" class="form-control edit-kmf" 
+                                                                   name="kmf_10000" min="0" value="{{ record.kmf_10000 or 0 }}" 
+                                                                   data-value="10000" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-warning p-2 mt-4">
+                                                                <small>= <span class="edit-total-kmf10000-{{ record.id }}">{{ "{:,.0f}".format((record.kmf_10000 or 0) * 10000) }}</span> KMF</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">5,000 KMF</label>
+                                                            <input type="number" class="form-control edit-kmf" 
+                                                                   name="kmf_5000" min="0" value="{{ record.kmf_5000 or 0 }}" 
+                                                                   data-value="5000" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-warning p-2 mt-4">
+                                                                <small>= <span class="edit-total-kmf5000-{{ record.id }}">{{ "{:,.0f}".format((record.kmf_5000 or 0) * 5000) }}</span> KMF</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">2,000 KMF</label>
+                                                            <input type="number" class="form-control edit-kmf" 
+                                                                   name="kmf_2000" min="0" value="{{ record.kmf_2000 or 0 }}" 
+                                                                   data-value="2000" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-warning p-2 mt-4">
+                                                                <small>= <span class="edit-total-kmf2000-{{ record.id }}">{{ "{:,.0f}".format((record.kmf_2000 or 0) * 2000) }}</span> KMF</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">1,000 KMF</label>
+                                                            <input type="number" class="form-control edit-kmf" 
+                                                                   name="kmf_1000" min="0" value="{{ record.kmf_1000 or 0 }}" 
+                                                                   data-value="1000" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-warning p-2 mt-4">
+                                                                <small>= <span class="edit-total-kmf1000-{{ record.id }}">{{ "{:,.0f}".format((record.kmf_1000 or 0) * 1000) }}</span> KMF</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="row mb-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">500 KMF</label>
+                                                            <input type="number" class="form-control edit-kmf" 
+                                                                   name="kmf_500" min="0" value="{{ record.kmf_500 or 0 }}" 
+                                                                   data-value="500" data-record="{{ record.id }}">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="alert alert-warning p-2 mt-4">
+                                                                <small>= <span class="edit-total-kmf500-{{ record.id }}">{{ "{:,.0f}".format((record.kmf_500 or 0) * 500) }}</span> KMF</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="row mt-3">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="edit_count_date_{{ record.id }}" class="form-label">Count Date</label>
+                                                        <input type="date" class="form-control" 
+                                                               id="edit_count_date_{{ record.id }}" 
+                                                               name="count_date" 
+                                                               value="{{ record.count_date.strftime('%Y-%m-%d') }}" required>
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        <label for="edit_notes_{{ record.id }}" class="form-label">Notes</label>
+                                                        <textarea class="form-control" 
+                                                                  id="edit_notes_{{ record.id }}" 
+                                                                  name="notes" rows="2">{{ record.notes or '' }}</textarea>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="alert alert-primary">
+                                                        <strong><i class="fas fa-euro-sign"></i> EUR Total:</strong> €<span class="edit-eur-total-{{ record.id }}">0.00</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="alert alert-warning">
+                                                        <strong><i class="fas fa-coins"></i> KMF Total:</strong> <span class="edit-kmf-total-{{ record.id }}">0</span> KMF
+                                                        <br><small class="text-muted">(= €<span class="edit-kmf-to-eur-{{ record.id }}">0.00</span>)</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="alert alert-success">
+                                                <strong><i class="fas fa-calculator"></i> Grand Total:</strong> €<span class="edit-grand-total-{{ record.id }}">0.00</span>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-warning">
+                                                <i class="fas fa-save"></i> Update Billetage
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                         {% endfor %}
             {% else %}
             <div class="alert alert-info">
@@ -648,6 +888,86 @@
     
     // Initialize
     updateAllTotals();
+    
+    // Edit modal calculations
+    document.addEventListener('DOMContentLoaded', function() {
+        const editEurInputs = document.querySelectorAll('.edit-eur');
+        const editKmfInputs = document.querySelectorAll('.edit-kmf');
+        
+        editEurInputs.forEach(input => {
+            input.addEventListener('input', function() {
+                updateEditModalTotals(this.dataset.record);
+            });
+            // Initialize on load
+            updateEditModalTotals(input.dataset.record);
+        });
+        
+        editKmfInputs.forEach(input => {
+            input.addEventListener('input', function() {
+                updateEditModalTotals(this.dataset.record);
+            });
+        });
+    });
+    
+    function updateEditModalTotals(recordId) {
+        let eurTotal = 0;
+        let kmfTotal = 0;
+        
+        // Calculate EUR
+        const eurInputs = document.querySelectorAll(`.edit-eur[data-record="${recordId}"]`);
+        eurInputs.forEach(input => {
+            const count = parseInt(input.value) || 0;
+            const value = parseInt(input.dataset.value);
+            const total = count * value;
+            
+            // Update individual denomination total
+            const totalSpan = document.querySelector(`.edit-total-${value}-${recordId}`);
+            if (totalSpan) {
+                totalSpan.textContent = total.toFixed(2);
+            }
+            
+            eurTotal += total;
+        });
+        
+        // Calculate KMF
+        const kmfInputs = document.querySelectorAll(`.edit-kmf[data-record="${recordId}"]`);
+        kmfInputs.forEach(input => {
+            const count = parseInt(input.value) || 0;
+            const value = parseInt(input.dataset.value);
+            const total = count * value;
+            
+            // Update individual denomination total
+            const totalSpan = document.querySelector(`.edit-total-kmf${value}-${recordId}`);
+            if (totalSpan) {
+                totalSpan.textContent = total.toLocaleString('fr-FR');
+            }
+            
+            kmfTotal += total;
+        });
+        
+        // Update totals
+        const eurTotalSpan = document.querySelector(`.edit-eur-total-${recordId}`);
+        if (eurTotalSpan) {
+            eurTotalSpan.textContent = eurTotal.toFixed(2);
+        }
+        
+        const kmfTotalSpan = document.querySelector(`.edit-kmf-total-${recordId}`);
+        if (kmfTotalSpan) {
+            kmfTotalSpan.textContent = kmfTotal.toLocaleString('fr-FR');
+        }
+        
+        const kmfToEurSpan = document.querySelector(`.edit-kmf-to-eur-${recordId}`);
+        const kmfInEur = kmfTotal / EUR_TO_KMF;
+        if (kmfToEurSpan) {
+            kmfToEurSpan.textContent = kmfInEur.toFixed(2);
+        }
+        
+        const grandTotal = eurTotal + kmfInEur;
+        const grandTotalSpan = document.querySelector(`.edit-grand-total-${recordId}`);
+        if (grandTotalSpan) {
+            grandTotalSpan.textContent = grandTotal.toFixed(2);
+        }
+    }
 </script>
 
 {% endblock %}

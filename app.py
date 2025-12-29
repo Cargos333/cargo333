@@ -1134,6 +1134,54 @@ def billetage():
                          user_dict=user_dict,
                          filter_date=filter_date)
 
+@app.route('/billetage/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_billetage(id):
+    record = Billetage.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            # Update form data for bills
+            record.euro_500 = int(request.form.get('euro_500', 0) or 0)
+            record.euro_200 = int(request.form.get('euro_200', 0) or 0)
+            record.euro_100 = int(request.form.get('euro_100', 0) or 0)
+            record.euro_50 = int(request.form.get('euro_50', 0) or 0)
+            record.euro_20 = int(request.form.get('euro_20', 0) or 0)
+            record.euro_10 = int(request.form.get('euro_10', 0) or 0)
+            record.euro_5 = int(request.form.get('euro_5', 0) or 0)
+            
+            # Update form data for Comores denominations
+            record.kmf_10000 = int(request.form.get('kmf_10000', 0) or 0)
+            record.kmf_5000 = int(request.form.get('kmf_5000', 0) or 0)
+            record.kmf_2000 = int(request.form.get('kmf_2000', 0) or 0)
+            record.kmf_1000 = int(request.form.get('kmf_1000', 0) or 0)
+            record.kmf_500 = int(request.form.get('kmf_500', 0) or 0)
+            
+            record.notes = request.form.get('notes', '').strip()
+            count_date_str = request.form.get('count_date', '')
+            
+            # Parse count date
+            from datetime import datetime as dt
+            if count_date_str:
+                record.count_date = dt.strptime(count_date_str, '%Y-%m-%d').date()
+            
+            # Recalculate and update total
+            record.total_amount = record.calculate_total()
+            
+            db.session.commit()
+            
+            flash(f'Billetage updated successfully. Total: €{record.total_amount:.2f}', 'success')
+            return redirect(url_for('billetage'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating billetage: {str(e)}', 'danger')
+            return redirect(url_for('billetage'))
+    
+    # GET request - just redirect to main page with edit modal
+    return redirect(url_for('billetage'))
+
 @app.route('/billetage/<int:id>/delete', methods=['POST'])
 @login_required
 @admin_required

@@ -100,13 +100,9 @@
         border: 1px solid #000 !important;
     }
     
-    /* Hide Amount and Actions columns when printing */
-    table thead th:nth-child(5),
-    table tbody td:nth-child(5),
-    table tfoot td:nth-child(5),
-    table thead th:last-child,
-    table tbody td:last-child,
-    table tfoot td:last-child {
+    /* Hide Amount and Actions columns when printing (use classes for stability) */
+    th.amount, td.amount,
+    th.actions, td.actions {
         display: none !important;
     }
     
@@ -238,14 +234,14 @@
                             <th>Container</th>
                             <th>Sender Name</th>
                             <th>Receiver Name</th>
-                            <th>Amount (€)</th>
-                            <th>Service (€)</th>
+                            <th class="amount">Amount (€)</th>
+                            <th class="service">Service (€)</th>
                             <th>Exchange Rate</th>
-                            <th>Money in EURO</th>
+                            <th class="money-euro">Money in EURO</th>
                             <th>Money in AED</th>
                             <th>Market Rate</th>
                             <th>Money Received</th>
-                            <th>Actions</th>
+                            <th class="actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -280,7 +276,7 @@
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="actions">
                                 {% if current_user.role == 'Secretary' %}
                                     {% if item.is_received %}
                                         <span class="badge bg-success">Received</span>
@@ -313,10 +309,10 @@
                         <!-- Totals Row -->
                         <tr class="table-secondary fw-bold">
                             <td colspan="4">TOTAL</td>
-                            <td>{{ "{:,.0f}".format(total_amount) }} EUR</td>
-                            <td>{{ "{:,.0f}".format(total_service) }} EUR</td>
+                            <td class="amount">{{ "{:,.0f}".format(total_amount) }} EUR</td>
+                            <td class="service">{{ "{:,.0f}".format(total_service) }} EUR</td>
                             <td></td>
-                            <td><strong>{{ "{:,.0f}".format(total_euro) }} EUR</strong></td>
+                            <td class="money-euro"><strong>{{ "{:,.0f}".format(total_euro) }} EUR</strong></td>
                             <td><strong>{{ "{:,.0f}".format(total_aed) }} AED</strong></td>
                             <td></td>
                             <td>
@@ -326,7 +322,7 @@
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td></td>
+                            <td class="actions"></td>
                         </tr>
                     </tbody>
                 </table>

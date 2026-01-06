@@ -292,6 +292,9 @@
                     </a>
                     <a href="{{ url_for('couriers') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('couriers') or '/courier/' in request.path else '' }}">
                         <i class="fas fa-envelope"></i> Couriers
+                        {% if new_courier_count and new_courier_count > 0 %}
+                        <span class="badge bg-danger ms-2">{{ new_courier_count }}</span>
+                        {% endif %}
                     </a>
                     
                     <div class="sidebar-bottom">

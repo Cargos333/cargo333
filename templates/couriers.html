@@ -27,7 +27,7 @@
     <!-- Couriers List -->
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title">All Couriers</h5>
+            <h5 class="card-title">New Couriers</h5>
             {% if couriers %}
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -64,6 +64,53 @@
             </div>
             {% else %}
             <p class="text-muted">No couriers found. Create your first courier above.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- History Section - Approved Couriers -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">
+                <i class="fas fa-history"></i> History - Approved Couriers
+            </h5>
+            {% if approved_couriers %}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-success">
+                        <tr>
+                            <th>Courier ID</th>
+                            <th>Date</th>
+                            <th>Items Count</th>
+                            <th>Approved Items</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for courier in approved_couriers %}
+                        <tr>
+                            <td><strong>{{ courier.courier_id }}</strong></td>
+                            <td>{{ courier.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ courier.items|length }}</td>
+                            <td>
+                                <span class="badge bg-success">
+                                    {{ courier.items|selectattr('is_received', 'equalto', True)|list|length }} Approved
+                                </span>
+                            </td>
+                            <td>{{ courier.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <a href="{{ url_for('courier_details', id=courier.id) }}" class="btn btn-sm btn-success">
+                                    <i class="fas fa-eye"></i> View Details
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No approved couriers yet.</p>
             {% endif %}
         </div>
     </div>

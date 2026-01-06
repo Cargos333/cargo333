@@ -1,6 +1,8 @@
 from flask import render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import base64
 from db_config import app, db
 from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage
 from decorators import admin_required, secretary_required, manager_required
@@ -2714,14 +2716,30 @@ def create_courier():
     try:
         courier_id = request.form.get('courier_id')
         date_str = request.form.get('date')
-        
+        # Additional fields
+        brought_by_name = request.form.get('brought_by_name')
+        brought_by_phone = request.form.get('brought_by_phone')
+        assigned_to = request.form.get('assigned_to')
+
         from datetime import datetime
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        
+
         new_courier = Courier(
             courier_id=courier_id,
-            date=date
+            date=date,
+            brought_by_name=brought_by_name,
+            brought_by_phone=brought_by_phone,
+            assigned_to=assigned_to
         )
+
+        # Handle optional photo upload
+        photo = request.files.get('photo')
+        if photo and photo.filename:
+            filename = secure_filename(photo.filename)
+            data = photo.read()
+            new_courier.photo_filename = filename
+            new_courier.photo_data = data
+            new_courier.photo_mime = photo.mimetype
         
         db.session.add(new_courier)
         db.session.commit()
@@ -2773,6 +2791,14 @@ def courier_details(id):
     # Calculate benefit (only if items are approved)
     benefit = total_money_received - total_aed if total_money_received > 0 else 0
     
+    # Prepare photo data URI if available
+    courier_photo_url = None
+    try:
+        if courier.photo_data:
+            courier_photo_url = f"data:{courier.photo_mime};base64,{base64.b64encode(courier.photo_data).decode()}"
+    except Exception:
+        courier_photo_url = None
+
     return render_template('courier_details.html', 
                          courier=courier, 
                          items=items,
@@ -2784,7 +2810,8 @@ def courier_details(id):
                          total_euro=total_euro,
                          total_aed=total_aed,
                          total_money_received=total_money_received,
-                         benefit=benefit)
+                         benefit=benefit,
+                         courier_photo_url=courier_photo_url)
 
 @app.route('/courier/<int:id>/add-item', methods=['POST'])
 @login_required

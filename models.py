@@ -80,6 +80,15 @@ class Courier(db.Model):
     courier_id = db.Column(db.String(50), unique=True, nullable=False)
     date = db.Column(db.Date, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Person who brought the courier (optional fields)
+    brought_by_name = db.Column(db.String(100), nullable=True)
+    brought_by_phone = db.Column(db.String(50), nullable=True)
+    # Person assigned to handle the courier (optional)
+    assigned_to = db.Column(db.String(100), nullable=True)
+    # Optional photo of the person or document
+    photo_filename = db.Column(db.String(255), nullable=True)
+    photo_data = db.Column(db.LargeBinary, nullable=True)
+    photo_mime = db.Column(db.String(50), nullable=True)
     items = db.relationship('CourierItem', backref='courier', lazy=True, cascade='all, delete-orphan')
 
 class CourierItem(db.Model):

@@ -47,6 +47,20 @@ app.jinja_env.filters['format_number'] = format_number
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
+
+@app.context_processor
+def inject_new_courier_count():
+    """Make `new_courier_count` available in all templates.
+
+    Counts couriers that have no approved items (no CourierItem with is_received=True).
+    """
+    try:
+        # Count couriers where there isn't any approved CourierItem
+        new_count = Courier.query.filter(~Courier.items.any(CourierItem.is_received == True)).count()
+    except Exception:
+        new_count = 0
+    return dict(new_courier_count=new_count)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -2677,8 +2691,21 @@ def delete_client_from_records(id):
 @login_required
 def couriers():
     """List all couriers"""
-    couriers = Courier.query.order_by(Courier.created_at.desc()).all()
-    return render_template('couriers.html', couriers=couriers)
+    all_couriers = Courier.query.order_by(Courier.created_at.desc()).all()
+    
+    # Separate couriers into new (unapproved) and approved
+    new_couriers = []
+    approved_couriers = []
+    
+    for courier in all_couriers:
+        # Check if courier has at least one approved item
+        approved_items = CourierItem.query.filter_by(courier_id=courier.id, is_received=True).first()
+        if approved_items:
+            approved_couriers.append(courier)
+        else:
+            new_couriers.append(courier)
+    
+    return render_template('couriers.html', couriers=new_couriers, approved_couriers=approved_couriers)
 
 @app.route('/courier/create', methods=['POST'])
 @login_required

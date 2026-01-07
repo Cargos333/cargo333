@@ -167,6 +167,11 @@
                 <img src="{{ courier_photo_url }}" alt="Courier Photo" style="max-height:160px; max-width:220px; object-fit:cover;" class="img-thumbnail">
             </div>
             {% endif %}
+            <div class="mt-3">
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editCourierModal">
+                    <i class="fas fa-edit"></i> Edit Courier Information
+                </button>
+            </div>
         </div>
     </div>
     
@@ -442,6 +447,45 @@
                     <div class="mb-3">
                         <label for="edit_exchange_rate" class="form-label">Exchange Rate</label>
                         <input type="number" step="0.0001" class="form-control" id="edit_exchange_rate" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Courier Modal -->
+<div class="modal fade" id="editCourierModal" tabindex="-1" aria-labelledby="editCourierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCourierModalLabel">Edit Courier Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('edit_courier', id=courier.id) }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="brought_by_name_edit" class="form-label">Brought By (Name)</label>
+                        <input type="text" class="form-control" id="brought_by_name_edit" name="brought_by_name" value="{{ courier.brought_by_name or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="brought_by_phone_edit" class="form-label">WhatsApp Number</label>
+                        <input type="text" class="form-control" id="brought_by_phone_edit" name="brought_by_phone" value="{{ courier.brought_by_phone or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="assigned_to_edit" class="form-label">Assigned To</label>
+                        <input type="text" class="form-control" id="assigned_to_edit" name="assigned_to" value="{{ courier.assigned_to or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="photo_edit" class="form-label">Replace Photo (optional)</label>
+                        <input class="form-control" type="file" id="photo_edit" name="photo" accept="image/*">
+                        {% if courier.photo_filename %}
+                        <small class="form-text text-muted">Current file: {{ courier.photo_filename }}</small>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="modal-footer">

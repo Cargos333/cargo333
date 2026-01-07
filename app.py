@@ -57,10 +57,24 @@ def inject_new_courier_count():
     Counts couriers that have no approved items (no CourierItem with is_received=True).
     """
     try:
-        # Count couriers where there isn't any approved CourierItem
-        new_count = Courier.query.filter(~Courier.items.any(CourierItem.is_received == True)).count()
+        # If user is not authenticated, show zero
+        if not current_user or not current_user.is_authenticated:
+            return dict(new_courier_count=0)
+
+        base_q = Courier.query.filter(~Courier.items.any(CourierItem.is_received == True))
+
+        # For Secretary and Manager only, count couriers that have contact info (name or phone)
+        if current_user.role in ['Secretary', 'Manager']:
+            contact_filter = db.or_(
+                db.and_(Courier.brought_by_name.isnot(None), Courier.brought_by_name != ''),
+                db.and_(Courier.brought_by_phone.isnot(None), Courier.brought_by_phone != '')
+            )
+            base_q = base_q.filter(contact_filter)
+
+        new_count = base_q.count()
     except Exception:
         new_count = 0
+
     return dict(new_courier_count=new_count)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -2695,6 +2709,11 @@ def couriers():
     """List all couriers"""
     all_couriers = Courier.query.order_by(Courier.created_at.desc()).all()
     
+    # Filter couriers based on role visibility
+    # Secretary and Manager only see couriers with contact info (name or phone)
+    if current_user.role in ['Secretary', 'Manager']:
+        all_couriers = [c for c in all_couriers if c.brought_by_name or c.brought_by_phone]
+    
     # Separate couriers into new (unapproved) and approved
     new_couriers = []
     approved_couriers = []
@@ -2812,6 +2831,42 @@ def courier_details(id):
                          total_money_received=total_money_received,
                          benefit=benefit,
                          courier_photo_url=courier_photo_url)
+
+
+@app.route('/courier/<int:id>/edit', methods=['POST'])
+@login_required
+def edit_courier(id):
+    """Update courier information (brought_by, phone, assigned_to, photo)"""
+    courier = Courier.query.get_or_404(id)
+
+    brought_by_name = request.form.get('brought_by_name') or None
+    brought_by_phone = request.form.get('brought_by_phone') or None
+    assigned_to = request.form.get('assigned_to') or None
+
+    courier.brought_by_name = brought_by_name
+    courier.brought_by_phone = brought_by_phone
+    courier.assigned_to = assigned_to
+
+    # Handle optional photo replacement
+    photo = request.files.get('photo')
+    if photo and photo.filename:
+        filename = secure_filename(photo.filename)
+        try:
+            data = photo.read()
+            courier.photo_filename = filename
+            courier.photo_data = data
+            courier.photo_mime = photo.mimetype
+        except Exception:
+            pass
+
+    try:
+        db.session.commit()
+        flash('Courier information updated successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating courier: {str(e)}', 'danger')
+
+    return redirect(url_for('courier_details', id=id))
 
 @app.route('/courier/<int:id>/add-item', methods=['POST'])
 @login_required

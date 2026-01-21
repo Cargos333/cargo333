@@ -120,9 +120,16 @@
     <div class="card">
         <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="fas fa-list"></i> All Tickets</h5>
-            <button type="button" class="btn btn-danger btn-sm" id="deleteSelectedBtn" style="display: none;" onclick="deleteSelected()">
-                <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
-            </button>
+            <div class="d-flex align-items-center gap-3">
+                <!-- Selected Totals Display -->
+                <div id="selectedTotals" class="text-white" style="display: none;">
+                    <small>Selected: <span id="selectedTotalAmount">€0.00</span> | 
+                           Count: <span id="selectedTicketCount">0</span></small>
+                </div>
+                <button type="button" class="btn btn-danger btn-sm" id="deleteSelectedBtn" style="display: none;" onclick="deleteSelected()">
+                    <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+                </button>
+            </div>
         </div>
         <div class="card-body">
             {% if records %}
@@ -148,7 +155,7 @@
                     </thead>
                     <tbody>
                         {% for record in records %}
-                        <tr>
+                        <tr data-amount="{{ record.amount }}" data-service-charge="{{ record.service_charge }}" data-total="{{ record.total_amount }}">
                             <td>
                                 <input type="checkbox" class="ticket-checkbox" name="ticket_ids" value="{{ record.id }}" onchange="updateSelectedCount()">
                             </td>
@@ -236,6 +243,23 @@
         const count = checkboxes.length;
         document.getElementById('selectedCount').textContent = count;
         document.getElementById('deleteSelectedBtn').style.display = count > 0 ? 'block' : 'none';
+        
+        // Calculate totals for selected rows
+        let totalAmount = 0;
+        let totalServiceCharge = 0;
+        let totalSum = 0;
+        
+        checkboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            totalAmount += parseFloat(row.dataset.amount) || 0;
+            totalServiceCharge += parseFloat(row.dataset.serviceCharge) || 0;
+            totalSum += parseFloat(row.dataset.total) || 0;
+        });
+        
+        // Update selected totals display
+        document.getElementById('selectedTotalAmount').textContent = '€' + totalSum.toFixed(2);
+        document.getElementById('selectedTicketCount').textContent = count;
+        document.getElementById('selectedTotals').style.display = count > 0 ? 'block' : 'none';
         
         // Update "select all" checkbox state
         const allCheckboxes = document.querySelectorAll('.ticket-checkbox');

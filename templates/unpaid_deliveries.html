@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Unpaid Deliveries</h1>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Containers with Unpaid Freight</h5>
+                    <h2>{{ total_containers }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Partially Paid</h5>
+                    <h2>{{ partial_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Fully Unpaid</h5>
+                    <h2>{{ unpaid_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Outstanding</h5>
+                    <h2>AED {{ total_outstanding|format_number }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('unpaid_deliveries') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">Search Container</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           placeholder="Container number or name" value="{{ search_query }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="payment_status" class="form-label">Payment Status</label>
+                    <select class="form-select" id="payment_status" name="payment_status">
+                        <option value="">All</option>
+                        <option value="unpaid" {% if payment_filter == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                        <option value="partial" {% if payment_filter == 'partial' %}selected{% endif %}>Partially Paid</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="destination" class="form-label">Destination</label>
+                    <select class="form-select" id="destination" name="destination">
+                        <option value="">All</option>
+                        {% for dest in destinations %}
+                        <option value="{{ dest }}" {% if destination_filter == dest %}selected{% endif %}>{{ dest }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <a href="{{ url_for('unpaid_deliveries') }}" class="btn btn-secondary">
+                        <i class="fas fa-redo"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Containers List -->
+    {% if enriched_containers %}
+    <div class="row">
+        {% for item in enriched_containers %}
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">
+                                <i class="fas fa-box"></i>
+                                <a href="{{ url_for('container_details', id=item.container.id) }}" 
+                                   class="text-decoration-none">
+                                    {{ item.container.container_number }}
+                                </a>
+                                {% if item.container.container_name %}
+                                <small class="text-muted">({{ item.container.container_name }})</small>
+                                {% endif %}
+                            </h5>
+                            <small class="text-muted">
+                                <i class="fas fa-map-marker-alt"></i> {{ item.container.destination }} | 
+                                <i class="fas fa-cube"></i> {{ item.container.container_type }} | 
+                                <i class="fas fa-users"></i> {{ item.shipment_count }} shipment(s)
+                            </small>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <span class="badge bg-danger fs-6">
+                                <i class="fas fa-money-bill-wave"></i> AED {{ item.total_unpaid|format_number }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Client (Mark)</th>
+                                    <th>Volume (m³)</th>
+                                    <th>Price</th>
+                                    <th>Extra Charge</th>
+                                    <th>Total Price</th>
+                                    <th>Paid</th>
+                                    <th>Outstanding</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for shipment in item.shipments %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ shipment.client.mark }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ shipment.client.name }}</small>
+                                    </td>
+                                    <td>{{ shipment.volume }}</td>
+                                    <td>AED {{ shipment.price|format_number }}</td>
+                                    <td>
+                                        {% if shipment.extra_charge > 0 %}
+                                        AED {{ shipment.extra_charge|format_number }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>AED {{ shipment.total_price|format_number }}</td>
+                                    <td>AED {{ shipment.paid_amount|format_number }}</td>
+                                    <td>
+                                        <strong class="text-danger">
+                                            AED {{ shipment.outstanding|format_number }}
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        {% if shipment.payment_status == 'unpaid' %}
+                                        <span class="badge bg-danger">Unpaid</span>
+                                        {% elif shipment.payment_status == 'partial' %}
+                                        <span class="badge bg-warning text-dark">Partial</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group" aria-label="Actions">
+                                            <form method="POST" action="{{ url_for('mark_shipment_paid', id=shipment.id) }}" style="display:inline;">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Mark as Paid">
+                                                    <i class="fas fa-check-circle"></i>
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" 
+                                                    data-bs-target="#updatePaymentModal{{ shipment.id }}" title="Update Partial Payment">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Update Payment Modal -->
+                                <div class="modal fade" id="updatePaymentModal{{ shipment.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Update Payment - {{ shipment.client.mark }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form method="POST" action="{{ url_for('update_partial_payment', id=shipment.id) }}">
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Total Price (AED)</label>
+                                                        <input type="text" class="form-control" value="AED {{ shipment.total_price|format_number }}" disabled>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Already Paid (AED)</label>
+                                                        <input type="text" class="form-control" value="AED {{ shipment.paid_amount|format_number }}" disabled>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label for="paid_amount_{{ shipment.id }}" class="form-label">New Payment Amount (AED)</label>
+                                                        <input type="number" step="0.01" class="form-control" id="paid_amount_{{ shipment.id }}" 
+                                                               name="paid_amount" value="{{ shipment.paid_amount }}" 
+                                                               min="0" max="{{ shipment.total_price }}" required>
+                                                        <small class="text-muted">Enter the total amount to be paid (min: 0, max: {{ shipment.total_price }})</small>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary">Update Payment</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        <i class="fas fa-info-circle"></i> No delivered containers with unpaid or partially paid freight fees found.
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .table-hover tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .badge {
+        font-size: 0.9rem;
+    }
+    
+    .card-header {
+        padding: 1rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+</style>
+{% endblock %}

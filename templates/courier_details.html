@@ -395,6 +395,238 @@
     </div>
     {% endif %}
     
+    <!-- Cash Counting (Billetage) Section - Only show if courier is active (not approved) and user is not Secretary/Manager -->
+    {% set has_items = items|length > 0 %}
+    {% set is_not_approved = approved_items|length == 0 %}
+    {% if has_items and is_not_approved and current_user.role not in ['Secretary', 'Manager'] %}
+    <div class="card mt-4 no-print">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-coins"></i> Cash Counting (Billetage)</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_courier_billetage', courier_id=courier.id) }}">
+                <div class="row">
+                    <!-- AED Denominations (Left Side) -->
+                    <div class="col-md-6">
+                        <h6 class="text-primary mb-3"><i class="fas fa-money-bill"></i> AED Denominations</h6>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label">1000 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_1000" 
+                                       id="aed_1000" value="0" min="0" data-value="1000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">500 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_500" 
+                                       id="aed_500" value="0" min="0" data-value="500">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">200 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_200" 
+                                       id="aed_200" value="0" min="0" data-value="200">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">100 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_100" 
+                                       id="aed_100" value="0" min="0" data-value="100">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">50 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_50" 
+                                       id="aed_50" value="0" min="0" data-value="50">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">20 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_20" 
+                                       id="aed_20" value="0" min="0" data-value="20">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">10 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_10" 
+                                       id="aed_10" value="0" min="0" data-value="10">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">5 AED</label>
+                                <input type="number" class="form-control denomination-input" name="aed_5" 
+                                       id="aed_5" value="0" min="0" data-value="5">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Euro Denominations (Right Side) -->
+                    <div class="col-md-6">
+                        <h6 class="text-success mb-3"><i class="fas fa-euro-sign"></i> Euro Denominations</h6>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label">500 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_500" 
+                                       id="euro_500" value="0" min="0" data-value="500">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">200 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_200" 
+                                       id="euro_200" value="0" min="0" data-value="200">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">100 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_100" 
+                                       id="euro_100" value="0" min="0" data-value="100">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">50 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_50" 
+                                       id="euro_50" value="0" min="0" data-value="50">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">20 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_20" 
+                                       id="euro_20" value="0" min="0" data-value="20">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">10 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_10" 
+                                       id="euro_10" value="0" min="0" data-value="10">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">5 EUR</label>
+                                <input type="number" class="form-control denomination-input-euro" name="euro_5" 
+                                       id="euro_5" value="0" min="0" data-value="5">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Exchange Rate for Euro to AED -->
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Exchange Rate (EUR to AED)</label>
+                        <input type="number" step="0.0001" class="form-control" name="euro_to_aed_rate" 
+                               id="euro_to_aed_rate" value="4.0" required>
+                        <small class="text-muted">Rate to convert EUR to AED for comparison</small>
+                    </div>
+                </div>
+                
+                <!-- Summary Display -->
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="alert alert-info">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>Counted AED:</strong>
+                                    <div class="h5 mb-0" id="total_aed_counted">0 AED</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Counted EUR (in AED):</strong>
+                                    <div class="h5 mb-0" id="total_euro_in_aed">0 AED</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Total Counted:</strong>
+                                    <div class="h5 mb-0 text-primary" id="total_counted">0 AED</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Expected:</strong>
+                                    <div class="h5 mb-0">{{ "{:,.0f}".format(total_aed) }} AED</div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <strong>Difference:</strong>
+                                    <div class="h4 mb-0" id="difference_display">
+                                        <span id="difference_amount">0</span> AED
+                                        <span id="difference_status" class="badge"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Notes -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="2" 
+                                  placeholder="Any additional notes about the cash count"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Submit Button -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Cash Count
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Display Previous Billetages - Always show if there are any -->
+    {% if courier_billetages %}
+    <div class="card mt-4 no-print">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-history"></i> Cash Count History</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Total AED</th>
+                            <th>Total EUR (in AED)</th>
+                            <th>Total Counted</th>
+                            <th>Expected</th>
+                            <th>Difference</th>
+                            <th>Counted By</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for billetage in courier_billetages %}
+                        <tr>
+                            <td>{{ billetage.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ "{:,.0f}".format(billetage.total_aed) }} AED</td>
+                            <td>{{ "{:,.0f}".format(billetage.total_euro_in_aed) }} AED</td>
+                            <td><strong>{{ "{:,.0f}".format(billetage.total_counted) }} AED</strong></td>
+                            <td>{{ "{:,.0f}".format(billetage.expected_amount) }} AED</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if billetage.difference == 0 else ('warning' if billetage.difference|abs < 100 else 'danger') }}">
+                                    {{ "{:,.0f}".format(billetage.difference) }} AED
+                                </span>
+                            </td>
+                            <td>{{ billetage.counted_by_user.username if billetage.counted_by_user else 'Unknown' }}</td>
+                            <td>{{ billetage.notes or '-' }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" 
+                                            data-bs-target="#viewBilletageModal{{ billetage.id }}" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% if current_user.role not in ['Secretary', 'Manager'] %}
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" 
+                                            data-bs-target="#editBilletageModal{{ billetage.id }}" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger" 
+                                            onclick="deleteBilletage({{ billetage.id }}, {{ courier.id }})" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <div class="mt-3">
         <a href="{{ url_for('couriers') }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Couriers
@@ -404,6 +636,238 @@
         </button>
     </div>
 </div>
+
+<!-- Billetage Modals -->
+{% for billetage in courier_billetages %}
+<!-- View Billetage Modal -->
+<div class="modal fade" id="viewBilletageModal{{ billetage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cash Count Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">AED Denominations</h6>
+                        <table class="table table-sm">
+                            {% if billetage.aed_1000 > 0 %}<tr><td>1000 AED:</td><td><strong>{{ billetage.aed_1000 }}</strong> × 1000 = {{ billetage.aed_1000 * 1000 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_500 > 0 %}<tr><td>500 AED:</td><td><strong>{{ billetage.aed_500 }}</strong> × 500 = {{ billetage.aed_500 * 500 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_200 > 0 %}<tr><td>200 AED:</td><td><strong>{{ billetage.aed_200 }}</strong> × 200 = {{ billetage.aed_200 * 200 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_100 > 0 %}<tr><td>100 AED:</td><td><strong>{{ billetage.aed_100 }}</strong> × 100 = {{ billetage.aed_100 * 100 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_50 > 0 %}<tr><td>50 AED:</td><td><strong>{{ billetage.aed_50 }}</strong> × 50 = {{ billetage.aed_50 * 50 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_20 > 0 %}<tr><td>20 AED:</td><td><strong>{{ billetage.aed_20 }}</strong> × 20 = {{ billetage.aed_20 * 20 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_10 > 0 %}<tr><td>10 AED:</td><td><strong>{{ billetage.aed_10 }}</strong> × 10 = {{ billetage.aed_10 * 10 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_5 > 0 %}<tr><td>5 AED:</td><td><strong>{{ billetage.aed_5 }}</strong> × 5 = {{ billetage.aed_5 * 5 }} AED</td></tr>{% endif %}
+                            {% if billetage.aed_1000 == 0 and billetage.aed_500 == 0 and billetage.aed_200 == 0 and billetage.aed_100 == 0 and billetage.aed_50 == 0 and billetage.aed_20 == 0 and billetage.aed_10 == 0 and billetage.aed_5 == 0 %}
+                            <tr><td colspan="2" class="text-muted">No AED denominations counted</td></tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">Euro Denominations</h6>
+                        <table class="table table-sm">
+                            {% if billetage.euro_500 > 0 %}<tr><td>500 EUR:</td><td><strong>{{ billetage.euro_500 }}</strong> × 500 = {{ billetage.euro_500 * 500 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_200 > 0 %}<tr><td>200 EUR:</td><td><strong>{{ billetage.euro_200 }}</strong> × 200 = {{ billetage.euro_200 * 200 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_100 > 0 %}<tr><td>100 EUR:</td><td><strong>{{ billetage.euro_100 }}</strong> × 100 = {{ billetage.euro_100 * 100 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_50 > 0 %}<tr><td>50 EUR:</td><td><strong>{{ billetage.euro_50 }}</strong> × 50 = {{ billetage.euro_50 * 50 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_20 > 0 %}<tr><td>20 EUR:</td><td><strong>{{ billetage.euro_20 }}</strong> × 20 = {{ billetage.euro_20 * 20 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_10 > 0 %}<tr><td>10 EUR:</td><td><strong>{{ billetage.euro_10 }}</strong> × 10 = {{ billetage.euro_10 * 10 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_5 > 0 %}<tr><td>5 EUR:</td><td><strong>{{ billetage.euro_5 }}</strong> × 5 = {{ billetage.euro_5 * 5 }} EUR</td></tr>{% endif %}
+                            {% if billetage.euro_500 == 0 and billetage.euro_200 == 0 and billetage.euro_100 == 0 and billetage.euro_50 == 0 and billetage.euro_20 == 0 and billetage.euro_10 == 0 and billetage.euro_5 == 0 %}
+                            <tr><td colspan="2" class="text-muted">No Euro denominations counted</td></tr>
+                            {% endif %}
+                        </table>
+                        <p><strong>Exchange Rate:</strong> {{ billetage.euro_to_aed_rate }} AED per EUR</p>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <div class="row">
+                        <div class="col-md-6"><strong>Total AED:</strong> {{ "{:,.0f}".format(billetage.total_aed) }} AED</div>
+                        <div class="col-md-6"><strong>Total EUR (in AED):</strong> {{ "{:,.0f}".format(billetage.total_euro_in_aed) }} AED</div>
+                        <div class="col-md-6"><strong>Total Counted:</strong> {{ "{:,.0f}".format(billetage.total_counted) }} AED</div>
+                        <div class="col-md-6"><strong>Expected:</strong> {{ "{:,.0f}".format(billetage.expected_amount) }} AED</div>
+                        <div class="col-md-12 mt-2"><strong>Difference:</strong> 
+                            <span class="badge bg-{{ 'success' if billetage.difference == 0 else ('warning' if billetage.difference|abs < 100 else 'danger') }}">
+                                {{ "{:,.0f}".format(billetage.difference) }} AED
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% if billetage.notes %}
+                <div class="mt-2">
+                    <strong>Notes:</strong>
+                    <p>{{ billetage.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Billetage Modal -->
+<div class="modal fade" id="editBilletageModal{{ billetage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Cash Count</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('edit_courier_billetage', billetage_id=billetage.id) }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary mb-3">AED Denominations</h6>
+                            <div class="row g-2">
+                                <div class="col-6"><label class="form-label">1000 AED</label><input type="number" class="form-control" name="aed_1000" value="{{ billetage.aed_1000 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">500 AED</label><input type="number" class="form-control" name="aed_500" value="{{ billetage.aed_500 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">200 AED</label><input type="number" class="form-control" name="aed_200" value="{{ billetage.aed_200 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">100 AED</label><input type="number" class="form-control" name="aed_100" value="{{ billetage.aed_100 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">50 AED</label><input type="number" class="form-control" name="aed_50" value="{{ billetage.aed_50 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">20 AED</label><input type="number" class="form-control" name="aed_20" value="{{ billetage.aed_20 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">10 AED</label><input type="number" class="form-control" name="aed_10" value="{{ billetage.aed_10 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">5 AED</label><input type="number" class="form-control" name="aed_5" value="{{ billetage.aed_5 }}" min="0"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success mb-3">Euro Denominations</h6>
+                            <div class="row g-2">
+                                <div class="col-6"><label class="form-label">500 EUR</label><input type="number" class="form-control" name="euro_500" value="{{ billetage.euro_500 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">200 EUR</label><input type="number" class="form-control" name="euro_200" value="{{ billetage.euro_200 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">100 EUR</label><input type="number" class="form-control" name="euro_100" value="{{ billetage.euro_100 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">50 EUR</label><input type="number" class="form-control" name="euro_50" value="{{ billetage.euro_50 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">20 EUR</label><input type="number" class="form-control" name="euro_20" value="{{ billetage.euro_20 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">10 EUR</label><input type="number" class="form-control" name="euro_10" value="{{ billetage.euro_10 }}" min="0"></div>
+                                <div class="col-6"><label class="form-label">5 EUR</label><input type="number" class="form-control" name="euro_5" value="{{ billetage.euro_5 }}" min="0"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Exchange Rate (EUR to AED)</label>
+                            <input type="number" step="0.0001" class="form-control" name="euro_to_aed_rate" value="{{ billetage.euro_to_aed_rate }}" required>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2">{{ billetage.notes or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+// Auto-calculate totals for billetage
+document.addEventListener('DOMContentLoaded', function() {
+    const expectedAmount = {{ total_aed if total_aed else 0 }};
+    
+    function updateBilletageTotals() {
+        // Calculate AED total
+        let aedTotal = 0;
+        document.querySelectorAll('.denomination-input').forEach(input => {
+            const count = parseInt(input.value) || 0;
+            const value = parseInt(input.getAttribute('data-value'));
+            aedTotal += count * value;
+        });
+        
+        // Calculate EUR total
+        let euroTotal = 0;
+        document.querySelectorAll('.denomination-input-euro').forEach(input => {
+            const count = parseInt(input.value) || 0;
+            const value = parseInt(input.getAttribute('data-value'));
+            euroTotal += count * value;
+        });
+        
+        // Get exchange rate
+        const euroToAedRate = parseFloat(document.getElementById('euro_to_aed_rate').value) || 4.0;
+        
+        // Convert EUR to AED
+        const euroInAed = euroTotal * euroToAedRate;
+        
+        // Calculate total
+        const totalCounted = aedTotal + euroInAed;
+        
+        // Calculate difference
+        const difference = totalCounted - expectedAmount;
+        
+        // Update display
+        document.getElementById('total_aed_counted').textContent = aedTotal.toLocaleString() + ' AED';
+        document.getElementById('total_euro_in_aed').textContent = euroInAed.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' AED';
+        document.getElementById('total_counted').textContent = totalCounted.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' AED';
+        document.getElementById('difference_amount').textContent = difference.toLocaleString('en-US', {maximumFractionDigits: 0});
+        
+        // Update difference status badge
+        const statusBadge = document.getElementById('difference_status');
+        const diffDisplay = document.getElementById('difference_display');
+        
+        if (difference === 0) {
+            statusBadge.className = 'badge bg-success';
+            statusBadge.textContent = '✓ Balanced';
+            diffDisplay.className = 'h4 mb-0 text-success';
+        } else if (difference > 0) {
+            statusBadge.className = 'badge bg-warning';
+            statusBadge.textContent = '↑ Surplus';
+            diffDisplay.className = 'h4 mb-0 text-warning';
+        } else {
+            statusBadge.className = 'badge bg-danger';
+            statusBadge.textContent = '↓ Shortage';
+            diffDisplay.className = 'h4 mb-0 text-danger';
+        }
+    }
+    
+    // Add event listeners to all denomination inputs
+    document.querySelectorAll('.denomination-input, .denomination-input-euro').forEach(input => {
+        input.addEventListener('input', updateBilletageTotals);
+    });
+    
+    // Add event listener to exchange rate
+    const rateInput = document.getElementById('euro_to_aed_rate');
+    if (rateInput) {
+        rateInput.addEventListener('input', updateBilletageTotals);
+    }
+    
+    // Initial calculation
+    updateBilletageTotals();
+});
+
+// Delete billetage function
+function deleteBilletage(billetageId, courierId) {
+    if (confirm('Are you sure you want to delete this cash count record?')) {
+        fetch(`/courier/billetage/${billetageId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Cash count deleted successfully');
+                window.location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error deleting cash count');
+            console.error('Error:', error);
+        });
+    }
+}
+</script>
 
 <!-- Edit Item Modal -->
 <div class="modal fade" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalLabel" aria-hidden="true">

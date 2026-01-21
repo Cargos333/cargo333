@@ -90,6 +90,7 @@ class Courier(db.Model):
     photo_data = db.Column(db.LargeBinary, nullable=True)
     photo_mime = db.Column(db.String(50), nullable=True)
     items = db.relationship('CourierItem', backref='courier', lazy=True, cascade='all, delete-orphan')
+    billetages = db.relationship('CourierBilletage', backref='courier', lazy=True, cascade='all, delete-orphan')
 
 class CourierItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -215,3 +216,45 @@ class User(UserMixin, db.Model):
 
     def is_admin(self):
         return self.role == 'Admin'
+
+class CourierBilletage(db.Model):
+    """Cash counting for courier money received"""
+    id = db.Column(db.Integer, primary_key=True)
+    courier_id = db.Column(db.Integer, db.ForeignKey('courier.id'), nullable=False)
+    
+    # AED denominations
+    aed_1000 = db.Column(db.Integer, default=0)
+    aed_500 = db.Column(db.Integer, default=0)
+    aed_200 = db.Column(db.Integer, default=0)
+    aed_100 = db.Column(db.Integer, default=0)
+    aed_50 = db.Column(db.Integer, default=0)
+    aed_20 = db.Column(db.Integer, default=0)
+    aed_10 = db.Column(db.Integer, default=0)
+    aed_5 = db.Column(db.Integer, default=0)
+    
+    # Euro denominations
+    euro_500 = db.Column(db.Integer, default=0)
+    euro_200 = db.Column(db.Integer, default=0)
+    euro_100 = db.Column(db.Integer, default=0)
+    euro_50 = db.Column(db.Integer, default=0)
+    euro_20 = db.Column(db.Integer, default=0)
+    euro_10 = db.Column(db.Integer, default=0)
+    euro_5 = db.Column(db.Integer, default=0)
+    
+    # Exchange rate for Euro to AED conversion
+    euro_to_aed_rate = db.Column(db.Float, nullable=False)
+    
+    # Calculated totals
+    total_aed = db.Column(db.Float, nullable=False)
+    total_euro_in_aed = db.Column(db.Float, nullable=False)
+    total_counted = db.Column(db.Float, nullable=False)
+    expected_amount = db.Column(db.Float, nullable=False)
+    difference = db.Column(db.Float, nullable=False)
+    
+    # Metadata
+    notes = db.Column(db.Text)
+    counted_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    counted_by_user = db.relationship('User', foreign_keys=[counted_by])

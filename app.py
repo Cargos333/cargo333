@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import base64
 from db_config import app, db
-from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage
+from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage
 from decorators import admin_required, secretary_required, manager_required
 from utils import format_number
 import pandas as pd
@@ -2223,6 +2223,124 @@ def payments_tracker():
         partial_count=partial_count
     )
 
+@app.route('/unpaid-deliveries')
+@login_required
+def unpaid_deliveries():
+    """Page to view all delivered containers with unpaid or partially paid freight fees"""
+    
+    # Get filters from query parameters
+    search_query = request.args.get('search', '').strip()
+    payment_filter = request.args.get('payment_status', '')
+    destination_filter = request.args.get('destination', '')
+    
+    # Base query to get delivered containers with unpaid or partially paid shipments
+    query = db.session.query(Container).filter(
+        Container.status == 'delivered'
+    ).distinct()
+    
+    # Join with shipments to find containers with unpaid/partial shipments
+    containers_with_unpaid = db.session.query(
+        Container.id
+    ).join(
+        Shipment, Container.id == Shipment.container_id
+    ).filter(
+        Container.status == 'delivered',
+        Shipment.payment_status.in_(['unpaid', 'partial'])
+    ).distinct()
+    
+    # Filter containers that have at least one unpaid/partial shipment
+    query = query.filter(Container.id.in_(containers_with_unpaid))
+    
+    # Apply additional filters if provided
+    if search_query:
+        query = query.filter(
+            db.or_(
+                Container.container_number.ilike(f'%{search_query}%'),
+                Container.container_name.ilike(f'%{search_query}%')
+            )
+        )
+    
+    if destination_filter:
+        query = query.filter(Container.destination == destination_filter)
+    
+    # Get all results ordered by ID descending
+    containers = query.order_by(Container.id.desc()).all()
+    
+    # Enrich containers with shipment and payment data
+    enriched_containers = []
+    
+    for container in containers:
+        # Get all shipments for this container
+        shipments = Shipment.query.filter_by(container_id=container.id).all()
+        
+        # Filter shipments with unpaid or partial payments
+        unpaid_shipments = [s for s in shipments if s.payment_status in ['unpaid', 'partial']]
+        
+        # Calculate totals for unpaid shipments
+        total_unpaid_amount = 0
+        shipment_details = []
+        
+        for shipment in unpaid_shipments:
+            total_price = shipment.price + shipment.extra_charge
+            paid = shipment.paid_amount or 0
+            outstanding = total_price - paid
+            
+            if outstanding > 0:
+                total_unpaid_amount += outstanding
+                
+                shipment_details.append({
+                    'id': shipment.id,
+                    'client': shipment.client,
+                    'volume': shipment.volume,
+                    'price': shipment.price,
+                    'extra_charge': shipment.extra_charge,
+                    'total_price': total_price,
+                    'paid_amount': paid,
+                    'outstanding': outstanding,
+                    'payment_status': shipment.payment_status
+                })
+        
+        # Only include container if it has unpaid shipments
+        if shipment_details:
+            enriched_containers.append({
+                'container': container,
+                'shipment_count': len(shipment_details),
+                'total_unpaid': total_unpaid_amount,
+                'shipments': shipment_details
+            })
+    
+    # Apply payment filter if specified
+    if payment_filter:
+        enriched_containers = [
+            ec for ec in enriched_containers 
+            if any(s['payment_status'] == payment_filter for s in ec['shipments'])
+        ]
+    
+    # Calculate total statistics
+    total_containers = len(enriched_containers)
+    total_outstanding = sum(ec['total_unpaid'] for ec in enriched_containers)
+    unpaid_count = sum(1 for ec in enriched_containers if any(s['payment_status'] == 'unpaid' for s in ec['shipments']))
+    partial_count = sum(1 for ec in enriched_containers if any(s['payment_status'] == 'partial' for s in ec['shipments']))
+    
+    # Get all destinations for filter dropdown
+    destinations = db.session.query(Container.destination).filter(
+        Container.status == 'delivered'
+    ).distinct().order_by(Container.destination).all()
+    destinations = [d[0] for d in destinations]
+    
+    return render_template(
+        'unpaid_deliveries.html',
+        enriched_containers=enriched_containers,
+        search_query=search_query,
+        payment_filter=payment_filter,
+        destination_filter=destination_filter,
+        destinations=destinations,
+        total_containers=total_containers,
+        total_outstanding=total_outstanding,
+        unpaid_count=unpaid_count,
+        partial_count=partial_count
+    )
+
 @app.route('/shipment/<int:id>/mark-as-paid', methods=['POST'])
 @login_required
 def mark_shipment_paid(id):
@@ -2817,6 +2935,9 @@ def courier_details(id):
             courier_photo_url = f"data:{courier.photo_mime};base64,{base64.b64encode(courier.photo_data).decode()}"
     except Exception:
         courier_photo_url = None
+    
+    # Get billetage records for this courier
+    courier_billetages = CourierBilletage.query.filter_by(courier_id=id).order_by(CourierBilletage.created_at.desc()).all()
 
     return render_template('courier_details.html', 
                          courier=courier, 
@@ -2830,7 +2951,185 @@ def courier_details(id):
                          total_aed=total_aed,
                          total_money_received=total_money_received,
                          benefit=benefit,
-                         courier_photo_url=courier_photo_url)
+                         courier_photo_url=courier_photo_url,
+                         courier_billetages=courier_billetages)
+
+
+@app.route('/courier/<int:courier_id>/billetage', methods=['POST'])
+@login_required
+def add_courier_billetage(courier_id):
+    """Add cash counting (billetage) for a courier"""
+    try:
+        courier = Courier.query.get_or_404(courier_id)
+        
+        # Check if courier has items
+        items = CourierItem.query.filter_by(courier_id=courier_id).all()
+        
+        if not items:
+            flash('Cannot add billetage to courier without items', 'danger')
+            return redirect(url_for('courier_details', id=courier_id))
+        
+        # Get form data for AED denominations
+        aed_1000 = int(request.form.get('aed_1000', 0) or 0)
+        aed_500 = int(request.form.get('aed_500', 0) or 0)
+        aed_200 = int(request.form.get('aed_200', 0) or 0)
+        aed_100 = int(request.form.get('aed_100', 0) or 0)
+        aed_50 = int(request.form.get('aed_50', 0) or 0)
+        aed_20 = int(request.form.get('aed_20', 0) or 0)
+        aed_10 = int(request.form.get('aed_10', 0) or 0)
+        aed_5 = int(request.form.get('aed_5', 0) or 0)
+        
+        # Get form data for Euro denominations
+        euro_500 = int(request.form.get('euro_500', 0) or 0)
+        euro_200 = int(request.form.get('euro_200', 0) or 0)
+        euro_100 = int(request.form.get('euro_100', 0) or 0)
+        euro_50 = int(request.form.get('euro_50', 0) or 0)
+        euro_20 = int(request.form.get('euro_20', 0) or 0)
+        euro_10 = int(request.form.get('euro_10', 0) or 0)
+        euro_5 = int(request.form.get('euro_5', 0) or 0)
+        
+        # Get exchange rate
+        euro_to_aed_rate = float(request.form.get('euro_to_aed_rate', 4.0))
+        
+        # Get notes
+        notes = request.form.get('notes', '').strip()
+        
+        # Calculate totals
+        total_aed = (aed_1000 * 1000 + aed_500 * 500 + aed_200 * 200 + 
+                     aed_100 * 100 + aed_50 * 50 + aed_20 * 20 + 
+                     aed_10 * 10 + aed_5 * 5)
+        
+        total_euro = (euro_500 * 500 + euro_200 * 200 + euro_100 * 100 + 
+                      euro_50 * 50 + euro_20 * 20 + euro_10 * 10 + euro_5 * 5)
+        
+        total_euro_in_aed = total_euro * euro_to_aed_rate
+        total_counted = total_aed + total_euro_in_aed
+        
+        # Calculate expected amount from courier items (based on exchange rate, not market rate)
+        items = CourierItem.query.filter_by(courier_id=courier_id).all()
+        expected_amount = sum(item.money_in_aed for item in items)
+        
+        # Calculate difference
+        difference = total_counted - expected_amount
+        
+        # Create billetage record
+        billetage = CourierBilletage(
+            courier_id=courier_id,
+            aed_1000=aed_1000,
+            aed_500=aed_500,
+            aed_200=aed_200,
+            aed_100=aed_100,
+            aed_50=aed_50,
+            aed_20=aed_20,
+            aed_10=aed_10,
+            aed_5=aed_5,
+            euro_500=euro_500,
+            euro_200=euro_200,
+            euro_100=euro_100,
+            euro_50=euro_50,
+            euro_20=euro_20,
+            euro_10=euro_10,
+            euro_5=euro_5,
+            euro_to_aed_rate=euro_to_aed_rate,
+            total_aed=total_aed,
+            total_euro_in_aed=total_euro_in_aed,
+            total_counted=total_counted,
+            expected_amount=expected_amount,
+            difference=difference,
+            notes=notes,
+            counted_by=current_user.id
+        )
+        
+        db.session.add(billetage)
+        db.session.commit()
+        
+        # Prepare flash message based on difference
+        if difference == 0:
+            flash(f'Cash count saved successfully! ✓ Balanced: {total_counted:,.0f} AED', 'success')
+        elif difference > 0:
+            flash(f'Cash count saved! Surplus of {difference:,.0f} AED (Total: {total_counted:,.0f} AED)', 'warning')
+        else:
+            flash(f'Cash count saved! Shortage of {abs(difference):,.0f} AED (Total: {total_counted:,.0f} AED)', 'danger')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error saving cash count: {str(e)}', 'danger')
+    
+    return redirect(url_for('courier_details', id=courier_id))
+
+
+@app.route('/courier/billetage/<int:billetage_id>/edit', methods=['POST'])
+@login_required
+def edit_courier_billetage(billetage_id):
+    """Edit an existing courier billetage"""
+    try:
+        billetage = CourierBilletage.query.get_or_404(billetage_id)
+        
+        # Get form data for AED denominations
+        billetage.aed_1000 = int(request.form.get('aed_1000', 0) or 0)
+        billetage.aed_500 = int(request.form.get('aed_500', 0) or 0)
+        billetage.aed_200 = int(request.form.get('aed_200', 0) or 0)
+        billetage.aed_100 = int(request.form.get('aed_100', 0) or 0)
+        billetage.aed_50 = int(request.form.get('aed_50', 0) or 0)
+        billetage.aed_20 = int(request.form.get('aed_20', 0) or 0)
+        billetage.aed_10 = int(request.form.get('aed_10', 0) or 0)
+        billetage.aed_5 = int(request.form.get('aed_5', 0) or 0)
+        
+        # Get form data for Euro denominations
+        billetage.euro_500 = int(request.form.get('euro_500', 0) or 0)
+        billetage.euro_200 = int(request.form.get('euro_200', 0) or 0)
+        billetage.euro_100 = int(request.form.get('euro_100', 0) or 0)
+        billetage.euro_50 = int(request.form.get('euro_50', 0) or 0)
+        billetage.euro_20 = int(request.form.get('euro_20', 0) or 0)
+        billetage.euro_10 = int(request.form.get('euro_10', 0) or 0)
+        billetage.euro_5 = int(request.form.get('euro_5', 0) or 0)
+        
+        # Get exchange rate and notes
+        billetage.euro_to_aed_rate = float(request.form.get('euro_to_aed_rate', 4.0))
+        billetage.notes = request.form.get('notes', '').strip()
+        
+        # Recalculate totals
+        billetage.total_aed = (billetage.aed_1000 * 1000 + billetage.aed_500 * 500 + 
+                               billetage.aed_200 * 200 + billetage.aed_100 * 100 + 
+                               billetage.aed_50 * 50 + billetage.aed_20 * 20 + 
+                               billetage.aed_10 * 10 + billetage.aed_5 * 5)
+        
+        total_euro = (billetage.euro_500 * 500 + billetage.euro_200 * 200 + 
+                      billetage.euro_100 * 100 + billetage.euro_50 * 50 + 
+                      billetage.euro_20 * 20 + billetage.euro_10 * 10 + 
+                      billetage.euro_5 * 5)
+        
+        billetage.total_euro_in_aed = total_euro * billetage.euro_to_aed_rate
+        billetage.total_counted = billetage.total_aed + billetage.total_euro_in_aed
+        billetage.difference = billetage.total_counted - billetage.expected_amount
+        
+        db.session.commit()
+        
+        flash('Cash count updated successfully!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating cash count: {str(e)}', 'danger')
+    
+    return redirect(url_for('courier_details', id=billetage.courier_id))
+
+
+@app.route('/courier/billetage/<int:billetage_id>/delete', methods=['POST'])
+@login_required
+def delete_courier_billetage(billetage_id):
+    """Delete a courier billetage"""
+    try:
+        billetage = CourierBilletage.query.get_or_404(billetage_id)
+        courier_id = billetage.courier_id
+        
+        db.session.delete(billetage)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Cash count deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/courier/<int:id>/edit', methods=['POST'])

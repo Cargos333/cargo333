@@ -3,7 +3,7 @@ Initialize production database on Render.com
 Run this script once after deployment to create all tables
 """
 from app import app, db
-from models import User, Client, Container, Shipment, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage
+from models import User, Client, Container, Shipment, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage
 from werkzeug.security import generate_password_hash
 
 def init_production_database():

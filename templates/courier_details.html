@@ -8,7 +8,6 @@
     #page-content-wrapper > nav,
     .btn, 
     button:not(.d-print-none), 
-    .modal, 
     .no-print, 
     nav, 
     .navbar, 
@@ -119,6 +118,31 @@
     
     /* Hide any remaining interactive elements */
     input, select, textarea, .form-control, .form-select {
+        display: none !important;
+    }
+    
+    /* Make modals printable */
+    .modal {
+        position: static !important;
+        display: block !important;
+        visibility: visible !important;
+        background: white !important;
+        border: 1px solid #000 !important;
+        margin: 20px 0 !important;
+        page-break-inside: avoid !important;
+    }
+    
+    .modal-dialog {
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .modal-header, .modal-footer {
         display: none !important;
     }
 }
@@ -395,10 +419,10 @@
     </div>
     {% endif %}
     
-    <!-- Cash Counting (Billetage) Section - Only show if courier is active (not approved) and user is not Secretary/Manager -->
+    <!-- Cash Counting (Billetage) Section - Only show if courier is active (not approved), user is not Secretary/Manager, and no billetage exists -->
     {% set has_items = items|length > 0 %}
     {% set is_not_approved = approved_items|length == 0 %}
-    {% if has_items and is_not_approved and current_user.role not in ['Secretary', 'Manager'] %}
+    {% if has_items and is_not_approved and current_user.role not in ['Secretary', 'Manager'] and courier_billetages|length == 0 %}
     <div class="card mt-4 no-print">
         <div class="card-header bg-warning text-dark">
             <h5 class="mb-0"><i class="fas fa-coins"></i> Cash Counting (Billetage)</h5>
@@ -565,7 +589,7 @@
     
     <!-- Display Previous Billetages - Always show if there are any -->
     {% if courier_billetages %}
-    <div class="card mt-4 no-print">
+    <div class="card mt-4">
         <div class="card-header bg-secondary text-white">
             <h5 class="mb-0"><i class="fas fa-history"></i> Cash Count History</h5>
         </div>

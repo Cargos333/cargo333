@@ -1,0 +1,305 @@
+{% extends "air_freight/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-user"></i> Client: {{ client.name }}
+            {% if client.package.delivered %}
+            <span class="badge bg-success ms-2"><i class="fas fa-check-circle"></i> Package Delivered</span>
+            {% endif %}
+        </h1>
+        <div>
+            {% if not client.package.delivered %}
+            <a href="{{ url_for('add_air_freight_product', client_id=client.id) }}" class="btn btn-success">
+                <i class="fas fa-cube"></i> Add Product
+            </a>
+            {% endif %}
+            <a href="{{ url_for('air_freight_package_details', package_id=client.package_id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Package
+            </a>
+        </div>
+    </div>
+
+    <!-- Client Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-gradient text-white py-3" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                    <h5 class="mb-0 d-flex align-items-center">
+                        <i class="fas fa-user-circle me-2"></i> 
+                        Client Information
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <!-- Client Details Section -->
+                        <div class="col-lg-5">
+                            <h6 class="text-muted text-uppercase mb-3" style="font-size: 0.875rem; letter-spacing: 0.5px;">
+                                <i class="fas fa-info-circle me-1"></i> Details
+                            </h6>
+                            <div class="client-info-list">
+                                <div class="info-item d-flex align-items-start mb-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-user text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Name</small>
+                                        <strong class="fs-6">{{ client.name }}</strong>
+                                    </div>
+                                </div>
+                                <div class="info-item d-flex align-items-start mb-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-tag text-info"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Mark</small>
+                                        <strong class="fs-6">{{ client.mark }}</strong>
+                                    </div>
+                                </div>
+                                {% if client.phone %}
+                                <div class="info-item d-flex align-items-start mb-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-phone text-success"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Phone</small>
+                                        <strong class="fs-6">{{ client.phone }}</strong>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="info-item d-flex align-items-start mb-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-box text-warning"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Package</small>
+                                        <strong class="fs-6">{{ client.package.package_number }}</strong>
+                                    </div>
+                                </div>
+                                <div class="info-item d-flex align-items-start">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-calendar text-secondary"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Created</small>
+                                        <strong class="fs-6">{{ client.created_at.strftime('%B %d, %Y at %H:%M') }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vertical Divider -->
+                        <div class="col-lg-1 d-none d-lg-block">
+                            <div class="vr h-100 opacity-25"></div>
+                        </div>
+
+                        <!-- Statistics Section -->
+                        <div class="col-lg-6">
+                            <h6 class="text-muted text-uppercase mb-3" style="font-size: 0.875rem; letter-spacing: 0.5px;">
+                                <i class="fas fa-chart-line me-1"></i> Statistics
+                            </h6>
+                            
+                            {% set total_qty = namespace(value=0) %}
+                            {% for product in client.products %}
+                                {% set total_qty.value = total_qty.value + product.quantity %}
+                            {% endfor %}
+                            
+                            {% set total_freight = namespace(value=0) %}
+                            {% for product in client.products %}
+                                {% set total_freight.value = total_freight.value + (product.value * product.quantity) %}
+                            {% endfor %}
+                            
+                            {% set paid_stats = namespace(count=0, amount=0) %}
+                            {% for product in client.products %}
+                                {% if product.freight_paid %}
+                                    {% set paid_stats.count = paid_stats.count + 1 %}
+                                    {% set paid_stats.amount = paid_stats.amount + (product.value * product.quantity) %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% set pending_count = client.products|length - paid_stats.count %}
+                            {% set pending_amount = total_freight.value - paid_stats.amount %}
+                            
+                            <div class="row g-3">
+                                <!-- Products Card -->
+                                <div class="col-md-6">
+                                    <div class="stat-card p-3 rounded" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <small class="d-block opacity-75 mb-1">Products</small>
+                                                <h3 class="mb-0 fw-bold">{{ client.products|length }}</h3>
+                                            </div>
+                                            <div class="stat-icon">
+                                                <i class="fas fa-cubes fa-2x opacity-50"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Total Quantity Card -->
+                                <div class="col-md-6">
+                                    <div class="stat-card p-3 rounded" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <small class="d-block opacity-75 mb-1">Total Quantity</small>
+                                                <h3 class="mb-0 fw-bold">{{ total_qty.value }}</h3>
+                                            </div>
+                                            <div class="stat-icon">
+                                                <i class="fas fa-layer-group fa-2x opacity-50"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Total Freight Card -->
+                                <div class="col-md-12">
+                                    <div class="stat-card p-3 rounded" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <small class="d-block opacity-75 mb-1">Total Freight Price</small>
+                                                <h3 class="mb-0 fw-bold">{{ "%.2f"|format(total_freight.value) }} <small class="fs-6">AED</small></h3>
+                                            </div>
+                                            <div class="stat-icon">
+                                                <i class="fas fa-dollar-sign fa-2x opacity-50"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Payment Status Cards -->
+                                <div class="col-md-6">
+                                    <div class="stat-card p-3 rounded border border-success" style="background: #d4edda;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <small class="text-success d-block mb-1">
+                                                    <i class="fas fa-check-circle me-1"></i> Paid
+                                                </small>
+                                                <strong class="text-success">{{ paid_stats.count }}</strong>
+                                                <small class="text-muted d-block">{{ "%.2f"|format(paid_stats.amount) }} AED</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="stat-card p-3 rounded border border-warning" style="background: #fff3cd;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <small class="text-warning d-block mb-1">
+                                                    <i class="fas fa-clock me-1"></i> Pending
+                                                </small>
+                                                <strong class="text-warning">{{ pending_count }}</strong>
+                                                <small class="text-muted d-block">{{ "%.2f"|format(pending_amount) }} AED</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        .info-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .stat-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .vr {
+            width: 1px;
+            background-color: #dee2e6;
+        }
+    </style>
+
+    <!-- Products List -->
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="fas fa-cubes"></i> Products</h5>
+        </div>
+        <div class="card-body">
+            {% if client.products %}
+                <div class="row">
+                    {% for product in client.products %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 border-info">
+                            {% if product.photo_url %}
+                            <div class="card-img-top text-center p-2">
+                                <img src="{{ product.photo_url }}" 
+                                     alt="Product Photo" class="img-fluid" style="max-height: 150px; object-fit: cover;">
+                            </div>
+                            {% endif %}
+                            <div class="card-body">
+                                <h6 class="card-title">{{ product.reference }}</h6>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <strong>Qty:</strong><br>{{ product.quantity }}
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Freight Price:</strong><br>{{ "%.2f"|format(product.value) }} AED
+                                    </div>
+                                </div>
+                                <div class="text-center mt-2">
+                                    {% if product.freight_paid %}
+                                        <span class="badge bg-success"><i class="fas fa-check"></i> Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-warning"><i class="fas fa-clock"></i> Pending</span>
+                                    {% endif %}
+                                </div>
+                                {% if product.weight %}
+                                <p class="mt-2 mb-0"><small><strong>Weight:</strong> {{ product.weight }} kg</small></p>
+                                {% endif %}
+                                <div class="mt-3 d-flex gap-2">
+                                    {% if not client.package.delivered %}
+                                    <a href="{{ url_for('edit_air_freight_product', product_id=product.id) }}" 
+                                       class="btn btn-warning btn-sm">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                    <form method="POST" action="{{ url_for('delete_air_freight_product', product_id=product.id) }}" 
+                                          class="d-inline" 
+                                          onsubmit="return confirm('Are you sure you want to delete this product?')">
+                                        <button type="submit" class="btn btn-danger btn-sm">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-footer text-muted">
+                                <small>Added: {{ product.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-cube fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">No products yet</h4>
+                    <p class="text-muted">Add products to this client.</p>
+                    <a href="{{ url_for('add_air_freight_product', client_id=client.id) }}" class="btn btn-success">
+                        <i class="fas fa-cube"></i> Add First Product
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

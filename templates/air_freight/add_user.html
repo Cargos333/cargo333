@@ -1,0 +1,104 @@
+{% extends "air_freight/base.html" %}
+
+{% block title %}Add Air Freight User{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-user-plus"></i> Add New User</h1>
+        <div>
+            <a href="{{ url_for('air_freight_users') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Users
+            </a>
+            <a href="{{ url_for('air_freight_logout') }}" class="btn btn-secondary">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+
+            <!-- Add User Form -->
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card shadow-sm" style="border-radius: 12px; border: none;">
+                        <div class="card-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
+                            <h5 class="mb-0"><i class="fas fa-user-plus"></i> User Information</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="POST">
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <label for="username" class="form-label">
+                                            <i class="fas fa-user text-primary"></i> Username *
+                                        </label>
+                                        <input type="text" class="form-control form-control-lg" id="username" name="username" required>
+                                        <div class="form-text">Unique username for login</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="password" class="form-label">
+                                            <i class="fas fa-lock text-danger"></i> Password *
+                                        </label>
+                                        <input type="password" class="form-control form-control-lg" id="password" name="password" required>
+                                        <div class="form-text">Minimum 6 characters</div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4 mt-1">
+                                    <div class="col-md-6">
+                                        <label for="full_name" class="form-label">
+                                            <i class="fas fa-user-tag text-info"></i> Full Name
+                                        </label>
+                                        <input type="text" class="form-control form-control-lg" id="full_name" name="full_name">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="role" class="form-label">
+                                            <i class="fas fa-crown text-warning"></i> Role *
+                                        </label>
+                                        <select class="form-select form-select-lg" id="role" name="role" required>
+                                            <option value="Employee">Employee</option>
+                                            <option value="Admin">Admin</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4 mt-1">
+                                    <div class="col-md-6">
+                                        <label for="email" class="form-label">
+                                            <i class="fas fa-envelope text-success"></i> Email
+                                        </label>
+                                        <input type="email" class="form-control form-control-lg" id="email" name="email">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="phone" class="form-label">
+                                            <i class="fas fa-phone text-secondary"></i> Phone
+                                        </label>
+                                        <input type="tel" class="form-control form-control-lg" id="phone" name="phone">
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                                    <a href="{{ url_for('air_freight_users') }}" class="btn btn-secondary me-md-2">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                    <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                        <i class="fas fa-save"></i> Create User
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Password strength validation
+document.getElementById('password').addEventListener('input', function() {
+    const password = this.value;
+    const isValid = password.length >= 6;
+    this.classList.toggle('is-valid', isValid);
+    this.classList.toggle('is-invalid', !isValid && password.length > 0);
+});
+</script>
+{% endblock %}

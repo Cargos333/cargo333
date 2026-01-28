@@ -1,0 +1,365 @@
+{% extends "air_freight/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1" style="font-weight: 700;"><i class="fas fa-box text-primary"></i> {{ package.package_number }}</h1>
+            <p class="text-muted mb-0">Package Details and Client Management
+                {% if package.delivered %}
+                <span class="badge bg-success ms-2"><i class="fas fa-check-circle"></i> Delivered</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if not package.delivered %}
+            <a href="{{ url_for('add_air_freight_client', package_id=package.id) }}" class="btn btn-success shadow-sm">
+                <i class="fas fa-user-plus me-1"></i> Add Client
+            </a>
+            {% endif %}
+            <a href="{{ url_for('air_freight_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Package Info and Stats -->
+    <div class="row g-4 mb-4">
+        <!-- Package Information Card -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-gradient text-white py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0 d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i> Package Information
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-list">
+                                <div class="info-item d-flex align-items-start mb-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-barcode text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Package Number</small>
+                                        <strong class="fs-6">{{ package.package_number }}</strong>
+                                    </div>
+                                </div>
+                                <div class="info-item d-flex align-items-start mb-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-tag text-info"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Mark on Carton</small>
+                                        <strong class="fs-6">{{ package.mark }}</strong>
+                                    </div>
+                                </div>
+                                <div class="info-item d-flex align-items-start">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-calendar text-secondary"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Created</small>
+                                        <strong class="fs-6">{{ package.created_at.strftime('%B %d, %Y at %H:%M') }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            {% if package.photo_url %}
+                            <div class="text-center">
+                                <img src="{{ package.photo_url }}" 
+                                     alt="Package Photo" class="img-fluid rounded shadow-sm" style="max-height: 200px; object-fit: cover;">
+                            </div>
+                            {% else %}
+                            <div class="text-center p-4 bg-light rounded">
+                                <i class="fas fa-image fa-3x text-muted mb-2"></i>
+                                <p class="text-muted mb-0">No photo available</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-gradient text-white py-3" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <h5 class="mb-0 d-flex align-items-center">
+                        <i class="fas fa-chart-line me-2"></i> Statistics
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="stat-item mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Clients</span>
+                            <i class="fas fa-users text-primary"></i>
+                        </div>
+                        <h2 class="mb-0 fw-bold text-primary">{{ package.clients|length }}</h2>
+                    </div>
+                    <hr class="my-3">
+                    <div class="stat-item">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Total Products</span>
+                            <i class="fas fa-cubes text-success"></i>
+                        </div>
+                        {% set total_products = namespace(value=0) %}
+                        {% for client in package.clients %}
+                            {% set total_products.value = total_products.value + client.products|length %}
+                        {% endfor %}
+                        <h2 class="mb-0 fw-bold text-success">{{ total_products.value }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients List -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-users text-primary me-2"></i> Clients in this Package</h5>
+        </div>
+        <div class="card-body p-4">
+            {% if package.clients %}
+                <div class="table-responsive table-mobile-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="border-0 d-none d-md-table-cell"><i class="fas fa-user me-2 text-muted"></i> Client Name</th>
+                                <th class="border-0"><i class="fas fa-tag me-2 text-muted"></i> Mark</th>
+                                <th class="border-0 d-none d-lg-table-cell"><i class="fas fa-phone me-2 text-muted"></i> Phone</th>
+                                <th class="border-0 d-none d-lg-table-cell"><i class="fas fa-cube me-2 text-muted"></i> Products</th>
+                                <th class="border-0 d-none d-xl-table-cell"><i class="fas fa-truck me-2 text-muted"></i> Status</th>
+                                <th class="border-0 d-none d-xl-table-cell"><i class="fas fa-calendar me-2 text-muted"></i> Added</th>
+                                <th class="border-0 text-center"><i class="fas fa-cogs me-2 text-muted"></i> Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in package.clients %}
+                            <tr class="client-row-hover">
+                                <td class="d-none d-md-table-cell"><strong class="text-dark">{{ client.name }}</strong></td>
+                                <td>
+                                    <a href="{{ url_for('air_freight_client_details', client_id=client.id) }}" 
+                                       class="badge bg-primary bg-opacity-10 text-primary text-decoration-none" 
+                                       title="View Products for {{ client.name }}">
+                                        {{ client.mark }}
+                                    </a>
+                                    <div class="d-md-none mt-1">
+                                        <small class="text-muted">{{ client.name }}</small>
+                                    </div>
+                                </td>
+                                <td class="d-none d-lg-table-cell">
+                                    {% if client.phone %}
+                                        <i class="fas fa-phone-alt text-success me-2"></i>{{ client.phone }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-lg-table-cell">
+                                    <span class="badge bg-info rounded-pill">{{ client.products|length }}</span>
+                                </td>
+                                <td class="d-none d-xl-table-cell">
+                                    {% if client.delivered %}
+                                        <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Delivered</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-shipping-fast me-1"></i>In Transit</span>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-xl-table-cell text-muted">{{ client.created_at.strftime('%b %d, %Y') }}</td>
+                                <td>
+                                    <div class="d-flex gap-2 justify-content-center">
+                                        {% if not client.delivered %}
+                                        <form method="POST" action="{{ url_for('confirm_client_delivery', client_id=client.id) }}" 
+                                              class="d-inline">
+                                            <button type="submit" class="btn btn-success" 
+                                                    title="Confirm Delivery to Client">
+                                                <i class="fas fa-check-circle"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        <button onclick="printClient({{ client.id }})" 
+                                           class="btn btn-outline-info" title="Print Client">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        {% if client.phone %}
+                                        <a href="https://wa.me/{{ client.phone|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '')|replace('+', '') }}" 
+                                           target="_blank" class="btn btn-success" title="Contact via WhatsApp">
+                                            <i class="fab fa-whatsapp"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if not package.delivered %}
+                                        <a href="{{ url_for('edit_air_freight_client', client_id=client.id) }}" 
+                                           class="btn btn-outline-warning" title="Edit Client">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_air_freight_client', client_id=client.id) }}" 
+                                              class="d-inline" 
+                                              onsubmit="return confirm('Are you sure you want to delete this client and all their products?')">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete Client">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <div class="mb-4" style="font-size: 4rem; color: #e9ecef;">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h4 class="fw-bold mb-2" style="color: #6c757d;">No clients yet</h4>
+                    <p class="text-muted mb-4">Add clients to this package to start tracking their products.</p>
+                    <a href="{{ url_for('add_air_freight_client', package_id=package.id) }}" class="btn btn-success btn-lg shadow-sm">
+                        <i class="fas fa-user-plus me-2"></i> Add First Client
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .info-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    
+    .client-row-hover {
+        transition: background-color 0.2s ease;
+    }
+    
+    .client-row-hover:hover {
+        background-color: rgba(102, 126, 234, 0.05);
+    }
+}
+
+/* Mobile-specific styles for package details */
+@media (max-width: 768px) {
+    .client-row-hover {
+        margin-bottom: 0.5rem;
+    }
+    
+    .client-row-hover td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .client-row-hover .badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    /* Mobile action buttons layout */
+    .d-flex.gap-2.justify-content-center {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.25rem !important;
+    }
+    
+    .d-flex.gap-2.justify-content-center .btn {
+        flex: 1;
+        min-width: 40px;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Mobile table improvements */
+    .table-mobile-responsive {
+        border: none;
+    }
+    
+    .table-mobile-responsive thead {
+        display: none;
+    }
+    
+    .table-mobile-responsive tbody tr {
+        display: block;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .table-mobile-responsive tbody td {
+        display: block;
+        border: none;
+        padding: 0.25rem 0;
+        text-align: left;
+    }
+    
+    .table-mobile-responsive tbody td:before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: #6c757d;
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Hide labels for mobile card layout */
+    .table-mobile-responsive tbody td[data-label]:before {
+        content: none;
+    }
+    
+    /* Mobile client card layout */
+    .mobile-client-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+    
+    .mobile-client-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+    
+    .mobile-client-info {
+        margin-bottom: 0.75rem;
+    }
+    
+    .mobile-client-actions {
+        display: flex;
+        gap: 0.25rem;
+        flex-wrap: wrap;
+    }
+    
+    .mobile-client-actions .btn {
+        flex: 1;
+        min-width: 40px;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+}
+</style>
+
+<script>
+function printClient(clientId) {
+    // Open print receipt page in new window
+    const printWindow = window.open(
+        '/air-freight/client/' + clientId + '/print', 
+        '_blank',
+        'width=900,height=700'
+    );
+}
+</script>
+{% endblock %}

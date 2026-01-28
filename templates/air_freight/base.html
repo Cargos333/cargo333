@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Freight - CARGO 333</title>
+
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+            overflow-x: hidden;
+        }
+
+        /* Modern Left Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+
+        /* Mobile Sidebar */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .sidebar-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .sidebar-overlay.show {
+                opacity: 1;
+                visibility: visible;
+            }
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-brand {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .sidebar-brand i {
+            font-size: 1.8rem;
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-item {
+            margin: 0.25rem 0;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.875rem 1.5rem;
+            color: rgba(255, 255, 255, 0.8) !important;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white !important;
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: white !important;
+            border-right: 3px solid #3b82f6;
+        }
+
+        .nav-link i {
+            font-size: 1.2rem;
+            width: 24px;
+            margin-right: 1rem;
+            text-align: center;
+        }
+
+        .sidebar-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-logout-sidebar {
+            width: 100%;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            border: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-logout-sidebar:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            padding: 2rem;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            z-index: 1001;
+            padding: 0 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .mobile-header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .mobile-brand {
+            color: white;
+            font-weight: 700;
+            font-size: 1.2rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+                padding: 4rem 1rem 1rem 1rem;
+            }
+
+            .mobile-header {
+                display: block;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+        }
+
+        /* Modern Cards */
+        .modern-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .modern-card:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .card-header-modern {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 1.25rem 1.5rem;
+            border-radius: 12px 12px 0 0;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Modern Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            padding: 0.65rem 1.5rem;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            padding: 0.65rem 1.5rem;
+            font-weight: 500;
+            border-radius: 8px;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            border: none;
+            padding: 0.65rem 1.5rem;
+            font-weight: 500;
+            border-radius: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        /* Stats Cards */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-card.primary {
+            border-left-color: #3b82f6;
+        }
+
+        .stat-card.success {
+            border-left-color: #10b981;
+        }
+
+        .stat-card.info {
+            border-left-color: #06b6d4;
+        }
+
+        .stat-card.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-icon.primary {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1e40af;
+        }
+
+        .stat-icon.success {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+
+        .stat-icon.info {
+            background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);
+            color: #164e63;
+        }
+
+        .stat-icon.warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin: 0.5rem 0;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Page Header */
+        .page-header {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            margin-bottom: 2rem;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .page-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin: 0;
+        }
+
+        .page-subtitle {
+            color: #64748b;
+            margin-top: 0.5rem;
+        }
+
+        /* Forms */
+        .form-label {
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control, .form-select {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.65rem 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Tables */
+        .table-modern {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table thead {
+            background: #f8fafc;
+        }
+
+        .table thead th {
+            border-bottom: 2px solid #e2e8f0;
+            color: #475569;
+            font-weight: 600;
+            padding: 1rem;
+        }
+
+        .table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+        }
+
+        .table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Badges */
+        .badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+                padding: 4rem 1rem 1rem 1rem;
+            }
+
+            .mobile-header {
+                display: block;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            /* Mobile Page Headers */
+            .d-flex.justify-content-between.align-items-center {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+                text-align: center;
+            }
+
+            .d-flex.justify-content-between.align-items-center > div:first-child {
+                text-align: center;
+            }
+
+            .d-flex.justify-content-between.align-items-center > div:last-child {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                width: 100%;
+            }
+
+            .d-flex.justify-content-between.align-items-center .btn {
+                width: 100%;
+            }
+
+            /* Mobile Cards */
+            .card {
+                margin-bottom: 1rem;
+                border-radius: 12px;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            /* Mobile Forms */
+            .form-control, .form-select {
+                font-size: 1rem;
+                padding: 0.75rem;
+                border-radius: 8px;
+            }
+
+            .form-label {
+                font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+            }
+
+            /* Mobile Buttons */
+            .btn {
+                padding: 0.75rem 1rem;
+                font-size: 0.9rem;
+                border-radius: 8px;
+                margin-bottom: 0.25rem;
+            }
+
+            .btn-lg {
+                padding: 0.875rem 1.25rem;
+                font-size: 1rem;
+            }
+
+            /* Mobile Tables */
+            .table-responsive {
+                font-size: 0.875rem;
+                border-radius: 8px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .table-responsive .btn {
+                padding: 0.375rem 0.5rem;
+                font-size: 0.75rem;
+            }
+
+            .table th, .table td {
+                padding: 0.75rem 0.5rem;
+                white-space: nowrap;
+            }
+
+            /* Mobile Action Buttons */
+            .d-flex.gap-2 {
+                flex-direction: column;
+                gap: 0.25rem !important;
+            }
+
+            .d-flex.gap-2 .btn {
+                width: 100%;
+            }
+
+            /* Mobile Info Items */
+            .info-item {
+                flex-direction: column;
+                text-align: center;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .info-icon {
+                align-self: center;
+                font-size: 1.5rem;
+            }
+
+            /* Mobile Stat Cards */
+            .stat-card {
+                margin-bottom: 1rem;
+                padding: 1rem;
+            }
+
+            .stat-card p {
+                font-size: 0.75rem;
+            }
+
+            .stat-card h2 {
+                font-size: 1.5rem;
+            }
+
+            .stat-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 1.5rem;
+                margin-bottom: 0.75rem;
+            }
+
+            /* Mobile Package Cards */
+            .package-card-hover {
+                margin-bottom: 1rem;
+            }
+
+            /* Mobile Row Layouts */
+            .row.g-4 {
+                --bs-gutter-x: 1rem;
+                --bs-gutter-y: 1rem;
+            }
+
+            .col-md-6, .col-md-8, .col-lg-7, .col-lg-5 {
+                margin-bottom: 1rem;
+            }
+
+            /* Mobile Container */
+            .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .container-fluid {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            /* Mobile Page Title */
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+
+            h2 {
+                font-size: 1.25rem;
+            }
+
+            h5 {
+                font-size: 1rem;
+            }
+
+            /* Mobile Badge */
+            .badge {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.5rem;
+            }
+
+            /* Mobile Form Grid */
+            .row.g-4 .col-md-6 {
+                margin-bottom: 1rem;
+            }
+
+            /* Mobile Card Footer */
+            .card-footer {
+                padding: 0.75rem 1rem;
+                font-size: 0.875rem;
+            }
+
+            /* Mobile Modal/Dialog */
+            .modal-dialog {
+                margin: 0.5rem;
+                max-width: none;
+            }
+
+            /* Mobile Alert */
+            .alert {
+                padding: 0.75rem 1rem;
+                margin-bottom: 1rem;
+            }
+
+            /* Mobile Breadcrumb */
+            .breadcrumb {
+                font-size: 0.875rem;
+            }
+
+            /* Mobile Dropdown */
+            .dropdown-menu {
+                font-size: 0.875rem;
+            }
+
+            /* Mobile Input Group */
+            .input-group {
+                flex-direction: column;
+            }
+
+            .input-group .btn {
+                margin-top: 0.25rem;
+            }
+
+            /* Mobile Progress */
+            .progress {
+                height: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+
+            /* Mobile List Group */
+            .list-group-item {
+                padding: 0.75rem 1rem;
+            }
+
+            /* Mobile Navigation */
+            .nav-tabs .nav-link {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            /* Mobile Pagination */
+            .pagination .page-link {
+                padding: 0.375rem 0.5rem;
+                font-size: 0.875rem;
+            }
+
+            /* Mobile Toast */
+            .toast {
+                max-width: none;
+                margin: 0 1rem 1rem 1rem;
+            }
+
+            /* Mobile Offcanvas */
+            .offcanvas {
+                width: 100vw;
+            }
+
+            /* Mobile Accordion */
+            .accordion-button {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .accordion-body {
+                padding: 1rem;
+            }
+
+            /* Mobile Carousel */
+            .carousel-caption {
+                bottom: 1rem;
+                left: 1rem;
+                right: 1rem;
+                text-align: center;
+            }
+
+            /* Mobile Utilities */
+            .text-center {
+                text-align: center !important;
+            }
+
+            .text-left {
+                text-align: left !important;
+            }
+
+            .text-right {
+                text-align: right !important;
+            }
+
+            /* Mobile Spacing */
+            .mb-4 {
+                margin-bottom: 1.5rem !important;
+            }
+
+            .mb-3 {
+                margin-bottom: 1rem !important;
+            }
+
+            .mt-4 {
+                margin-top: 1.5rem !important;
+            }
+
+            .mt-3 {
+                margin-top: 1rem !important;
+            }
+
+            .py-4 {
+                padding-top: 1.5rem !important;
+                padding-bottom: 1.5rem !important;
+            }
+
+            .py-3 {
+                padding-top: 1rem !important;
+                padding-bottom: 1rem !important;
+            }
+
+            .px-4 {
+                padding-left: 1.5rem !important;
+                padding-right: 1.5rem !important;
+            }
+
+            .px-3 {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }
+
+            /* Mobile Flex Utilities */
+            .d-flex {
+                flex-direction: column;
+            }
+
+            .justify-content-center {
+                align-items: center;
+            }
+
+            .align-items-center {
+                justify-content: center;
+            }
+
+            /* Mobile Grid */
+            .col-12 {
+                padding-left: 0;
+                padding-right: 0;
+            }
+
+            /* Mobile Hide/Show */
+            .d-none.d-md-block {
+                display: none !important;
+            }
+
+            .d-md-none {
+                display: block !important;
+            }
+
+            /* Mobile Font Sizes */
+            .fs-6 {
+                font-size: 1rem !important;
+            }
+
+            .fs-5 {
+                font-size: 1.25rem !important;
+            }
+
+            .fs-4 {
+                font-size: 1.5rem !important;
+            }
+
+            .fs-3 {
+                font-size: 1.75rem !important;
+            }
+
+            .fs-2 {
+                font-size: 2rem !important;
+            }
+
+            .fs-1 {
+                font-size: 2.5rem !important;
+            }
+
+            /* Mobile Specific Overrides */
+            .mobile-stack {
+                flex-direction: column !important;
+            }
+
+            .mobile-stack .btn {
+                width: 100% !important;
+                margin-bottom: 0.25rem;
+            }
+
+            .mobile-center {
+                text-align: center;
+            }
+
+            .mobile-full-width {
+                width: 100% !important;
+            }
+
+            /* Mobile Table Specific */
+            .table-mobile-responsive {
+                font-size: 0.8rem;
+            }
+
+            .table-mobile-responsive th,
+            .table-mobile-responsive td {
+                padding: 0.5rem 0.25rem;
+            }
+
+            .table-mobile-responsive .btn {
+                padding: 0.25rem 0.375rem;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Navbar Toggler */
+        .navbar-toggler {
+            border: none;
+            padding: 0.5rem;
+        }
+
+        .navbar-toggler:focus {
+            box-shadow: none;
+        }
+
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        .card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border-radius: 12px 12px 0 0 !important;
+            border: none;
+            padding: 1.25rem 1.5rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <div class="mobile-header-content">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <a href="{{ url_for('air_freight_dashboard') }}" class="mobile-brand">
+                    <i class="fas fa-plane-departure"></i>
+                    <span>Air Freight</span>
+                </a>
+                <div></div> <!-- Spacer for centering -->
+            </div>
+        </header>
+
+        <!-- Sidebar Overlay (Mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="{{ url_for('air_freight_dashboard') }}" class="sidebar-brand">
+                    <i class="fas fa-plane-departure"></i>
+                    <span>Air Freight</span>
+                </a>
+            </div>
+
+            <ul class="sidebar-nav">
+                <li class="nav-item">
+                    <a href="{{ url_for('air_freight_dashboard') }}" class="nav-link {% if request.endpoint == 'air_freight_dashboard' %}active{% endif %}">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('add_air_freight_package') }}" class="nav-link {% if request.endpoint == 'add_air_freight_package' %}active{% endif %}">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add Package</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('air_freight_history') }}" class="nav-link {% if request.endpoint == 'air_freight_history' %}active{% endif %}">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
+                    </a>
+                </li>
+                {% if current_user.is_admin() %}
+                <li class="nav-item">
+                    <a href="{{ url_for('air_freight_users') }}" class="nav-link {% if 'air_freight_users' in request.endpoint or 'add_air_freight_user' in request.endpoint or 'delete_air_freight_user' in request.endpoint %}active{% endif %}">
+                        <i class="fas fa-users"></i>
+                        <span>Users</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+
+            <div class="sidebar-footer">
+                <form method="POST" action="{{ url_for('air_freight_logout') }}">
+                    <button type="submit" class="btn-logout-sidebar">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            {% block content %}{% endblock %}
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        
+        <script>
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            }
+            
+            // Close sidebar when clicking on a nav link (mobile)
+            document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 768) {
+                        toggleSidebar();
+                    }
+                });
+            });
+            
+            // Close sidebar on window resize if desktop
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 768) {
+                    document.getElementById('sidebar').classList.remove('show');
+                    document.getElementById('sidebarOverlay').classList.remove('show');
+                }
+            });
+        </script>
+    </body>
+</html>

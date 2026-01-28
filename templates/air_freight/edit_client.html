@@ -1,0 +1,55 @@
+{% extends "air_freight/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-user-edit"></i> Edit Client</h1>
+        <a href="{{ url_for('air_freight_package_details', package_id=client.package_id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Package
+        </a>
+    </div>
+
+    <!-- Package Info -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5><i class="fas fa-box"></i> Package: {{ client.package.package_number }}</h5>
+            <p class="mb-0"><strong>Mark:</strong> {{ client.package.mark }}</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm" style="border-radius: 12px; border: none;">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px 12px 0 0;">
+                    <h5 class="mb-0"><i class="fas fa-user"></i> Edit Client Information</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label"><i class="fas fa-user text-primary"></i> Client Name *</label>
+                                <input type="text" class="form-control form-control-lg" id="name" name="name" value="{{ client.name }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="mark" class="form-label"><i class="fas fa-tag text-info"></i> Client Mark *</label>
+                                <input type="text" class="form-control form-control-lg" id="mark" name="mark" value="{{ client.mark }}" required>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <label for="phone" class="form-label"><i class="fas fa-phone text-success"></i> Phone Number</label>
+                            <input type="tel" class="form-control form-control-lg" id="phone" name="phone" value="{{ client.phone or '' }}">
+                        </div>
+
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <i class="fas fa-save"></i> Update Client
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

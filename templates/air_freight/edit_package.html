@@ -1,0 +1,57 @@
+{% extends "air_freight/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-edit"></i> Edit Package</h1>
+        <a href="{{ url_for('air_freight_dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm" style="border-radius: 12px; border: none;">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
+                    <h5 class="mb-0"><i class="fas fa-box"></i> Package Information</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="package_number" class="form-label"><i class="fas fa-barcode text-primary"></i> Package Number</label>
+                            <input type="text" class="form-control form-control-lg" id="package_number" value="{{ package.package_number }}" disabled>
+                            <div class="form-text">Package number cannot be changed</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="mark" class="form-label"><i class="fas fa-tag text-info"></i> Mark on Carton *</label>
+                            <input type="text" class="form-control form-control-lg" id="mark" name="mark" value="{{ package.mark }}" required>
+                        </div>
+
+                        {% if package.photo_url %}
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fas fa-image text-info"></i> Current Photo</label>
+                            <div class="text-center">
+                                <img src="{{ package.photo_url }}" alt="Current Package Photo" class="img-fluid shadow-sm" style="max-height: 200px; object-fit: cover; border-radius: 8px;">
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-4">
+                            <label for="photo" class="form-label"><i class="fas fa-camera text-warning"></i> Update Package Photo (optional)</label>
+                            <input type="file" class="form-control form-control-lg" id="photo" name="photo" accept="image/*">
+                            <div class="form-text">Leave empty to keep the current photo</div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <i class="fas fa-save"></i> Update Package
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

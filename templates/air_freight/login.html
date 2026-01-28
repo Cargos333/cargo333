@@ -1,0 +1,29 @@
+{% extends "air_freight/login_base.html" %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-danger shadow-sm" role="alert" style="border-radius: 8px;">
+                <i class="fas fa-exclamation-triangle"></i> {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<form method="POST">
+    <div class="mb-4">
+        <label for="username" class="form-label"><i class="fas fa-user text-primary"></i> Username</label>
+        <input type="text" class="form-control form-control-lg" id="username" name="username" required>
+    </div>
+    <div class="mb-4">
+        <label for="password" class="form-label"><i class="fas fa-lock text-danger"></i> Password</label>
+        <input type="password" class="form-control form-control-lg" id="password" name="password" required>
+    </div>
+    <div class="d-grid">
+        <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <i class="fas fa-sign-in-alt"></i> Login
+        </button>
+    </div>
+</form>
+{% endblock %}

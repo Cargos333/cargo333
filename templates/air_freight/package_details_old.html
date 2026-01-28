@@ -1,0 +1,134 @@
+{% extends "air_freight/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-box"></i> Package: {{ package.package_number }}</h1>
+        <div>
+            <a href="{{ url_for('add_air_freight_client', package_id=package.id) }}" class="btn btn-success">
+                <i class="fas fa-user-plus"></i> Add Client
+            </a>
+            <a href="{{ url_for('air_freight_dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Package Info -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Package Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Package Number:</strong> {{ package.package_number }}</p>
+                            <p><strong>Mark:</strong> {{ package.mark }}</p>
+                            <p><strong>Created:</strong> {{ package.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            {% if package.photo_url %}
+                            <div class="text-center">
+                                <img src="{{ package.photo_url }}" 
+                                     alt="Package Photo" class="img-fluid rounded" style="max-height: 200px; object-fit: cover;">
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Clients:</strong> {{ package.clients|length }}</p>
+                    <p><strong>Total Products:</strong> 
+                        {% set total_products = 0 %}
+                        {% for client in package.clients %}
+                            {% set total_products = total_products + client.products|length %}
+                        {% endfor %}
+                        {{ total_products }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients List -->
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="fas fa-users"></i> Clients in this Package</h5>
+        </div>
+        <div class="card-body">
+            {% if package.clients %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><i class="fas fa-user"></i> Client Name</th>
+                                <th><i class="fas fa-tag"></i> Mark</th>
+                                <th><i class="fas fa-phone"></i> Phone</th>
+                                <th><i class="fas fa-cube"></i> Products</th>
+                                <th><i class="fas fa-calendar"></i> Added</th>
+                                <th><i class="fas fa-cogs"></i> Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in package.clients %}
+                            <tr>
+                                <td><strong>{{ client.name }}</strong></td>
+                                <td>{{ client.mark }}</td>
+                                <td>
+                                    {% if client.phone %}
+                                        {{ client.phone }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ client.products|length }}</span>
+                                </td>
+                                <td>{{ client.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('air_freight_client_details', client_id=client.id) }}" 
+                                           class="btn btn-outline-primary" title="View Products">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('edit_air_freight_client', client_id=client.id) }}" 
+                                           class="btn btn-outline-warning" title="Edit Client">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_air_freight_client', client_id=client.id) }}" 
+                                              class="d-inline" 
+                                              onsubmit="return confirm('Are you sure you want to delete this client and all their products?')">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete Client">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">No clients yet</h4>
+                    <p class="text-muted">Add clients to this package to get started.</p>
+                    <a href="{{ url_for('add_air_freight_client', package_id=package.id) }}" class="btn btn-success">
+                        <i class="fas fa-user-plus"></i> Add First Client
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

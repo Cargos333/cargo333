@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Receipt - {{ client.name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        
+        .receipt {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #000;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header h2 {
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .info-section {
+            margin-bottom: 20px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            width: 40%;
+        }
+        
+        .info-value {
+            width: 60%;
+            text-align: right;
+        }
+        
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .products-table th {
+            background-color: #000;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        
+        .products-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .products-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .totals-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #000;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+        
+        .total-row.grand-total {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 2px solid #000;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .status-paid {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .status-unpaid {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+            }
+            
+            .receipt {
+                border: none;
+            }
+            
+            @page {
+                margin: 1cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <!-- Header -->
+        <div class="header">
+            <h1>CARGO 333</h1>
+            <h2>Air Freight Client Receipt</h2>
+        </div>
+        
+        <!-- Client Information -->
+        <div class="info-section">
+            <h3 style="margin-bottom: 10px; font-size: 16px;">Client Information</h3>
+            <div class="info-row">
+                <span class="info-label">Client Name:</span>
+                <span class="info-value">{{ client.name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Mark:</span>
+                <span class="info-value">{{ client.mark }}</span>
+            </div>
+            {% if client.phone %}
+            <div class="info-row">
+                <span class="info-label">Phone:</span>
+                <span class="info-value">{{ client.phone }}</span>
+            </div>
+            {% endif %}
+            <div class="info-row">
+                <span class="info-label">Package Number:</span>
+                <span class="info-value">{{ client.package.package_number }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date:</span>
+                <span class="info-value">{{ client.created_at.strftime('%B %d, %Y') }}</span>
+            </div>
+        </div>
+        
+        <!-- Products Table -->
+        <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 16px;">Products</h3>
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 30%;">Reference</th>
+                    <th style="width: 10%;">Qty</th>
+                    <th style="width: 15%;">Weight (kg)</th>
+                    <th style="width: 20%;">Freight (AED)</th>
+                    <th style="width: 20%;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in client.products %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ product.reference }}</strong></td>
+                    <td>{{ product.quantity }}</td>
+                    <td>{{ "%.2f"|format(product.weight) if product.weight else '-' }}</td>
+                    <td>{{ "%.2f"|format(product.value) }}</td>
+                    <td>
+                        {% if product.freight_paid %}
+                            <span class="status-badge status-paid">PAID</span>
+                        {% else %}
+                            <span class="status-badge status-unpaid">UNPAID</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Totals Section -->
+        <div class="totals-section">
+            {% set total_qty = namespace(value=0) %}
+            {% set total_weight = namespace(value=0) %}
+            {% set total_freight = namespace(value=0) %}
+            {% set paid_freight = namespace(value=0) %}
+            {% set unpaid_freight = namespace(value=0) %}
+            
+            {% for product in client.products %}
+                {% set total_qty.value = total_qty.value + product.quantity %}
+                {% set total_weight.value = total_weight.value + (product.weight or 0) %}
+                {% set total_freight.value = total_freight.value + product.value %}
+                {% if product.freight_paid %}
+                    {% set paid_freight.value = paid_freight.value + product.value %}
+                {% else %}
+                    {% set unpaid_freight.value = unpaid_freight.value + product.value %}
+                {% endif %}
+            {% endfor %}
+            
+            <div class="total-row">
+                <span>Total Quantity:</span>
+                <span><strong>{{ total_qty.value }}</strong> items</span>
+            </div>
+            <div class="total-row">
+                <span>Total Weight:</span>
+                <span><strong>{{ "%.2f"|format(total_weight.value) }}</strong> kg</span>
+            </div>
+            <div class="total-row">
+                <span>Total Freight:</span>
+                <span><strong>{{ "%.2f"|format(total_freight.value) }}</strong> AED</span>
+            </div>
+            <div class="total-row" style="color: #28a745;">
+                <span>Paid:</span>
+                <span><strong>{{ "%.2f"|format(paid_freight.value) }}</strong> AED</span>
+            </div>
+            <div class="total-row grand-total" style="color: #dc3545;">
+                <span>BALANCE DUE:</span>
+                <span>{{ "%.2f"|format(unpaid_freight.value) }} AED</span>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>Thank you for choosing CARGO 333 Air Freight Services</p>
+            <p>Printed on: {{ now.strftime('%B %d, %Y at %H:%M') }}</p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto print when page loads
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+{% extends "air_freight/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-cube"></i> Add Product</h1>
+        <a href="{{ url_for('air_freight_client_details', client_id=client.id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Client
+        </a>
+    </div>
+
+    <!-- Client Info -->
+    <div class="card mb-4 shadow-sm" style="border-radius: 12px; border: none;">
+        <div class="card-body">
+            <h5><i class="fas fa-user text-primary"></i> Client: {{ client.name }} ({{ client.mark }})</h5>
+            <p class="mb-0"><strong>Package:</strong> {{ client.package.package_number }}</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm" style="border-radius: 12px; border: none;">
+                <div class="card-header text-white" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 12px 12px 0 0;">
+                    <h5 class="mb-0"><i class="fas fa-plus"></i> Product Information</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label for="reference" class="form-label"><i class="fas fa-barcode text-primary"></i> Reference *</label>
+                                <input type="text" class="form-control form-control-lg" id="reference" name="reference" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="quantity" class="form-label"><i class="fas fa-boxes text-info"></i> Quantity *</label>
+                                <input type="number" class="form-control form-control-lg" id="quantity" name="quantity" min="1" value="1" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row g-4 mt-1">
+                            <div class="col-md-6">
+                                <label for="weight" class="form-label"><i class="fas fa-weight text-secondary"></i> Weight (kg)</label>
+                                <input type="number" class="form-control form-control-lg" id="weight" name="weight" min="0" step="0.01">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="freight_price_aed" class="form-label"><i class="fas fa-dollar-sign text-success"></i> Freight Price (AED) *</label>
+                                <input type="number" class="form-control form-control-lg" id="freight_price_aed" name="freight_price_aed" min="0" step="0.01" required>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="freight_paid" name="freight_paid">
+                                <label class="form-check-label" for="freight_paid">
+                                    <i class="fas fa-check-circle text-success"></i> Freight Paid
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <label for="photo" class="form-label"><i class="fas fa-camera text-warning"></i> Product Photo</label>
+                            <input type="file" class="form-control form-control-lg" id="photo" name="photo" accept="image/*">
+                            <div class="form-text">Upload a photo of the product</div>
+                        </div>
+                        
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-lg text-white" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                                <i class="fas fa-save"></i> Save Product
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

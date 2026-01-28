@@ -2,7 +2,7 @@
 Initialize production database on Render.com
 Run this script once after deployment to create all tables
 """
-from app import app, db
+from db_config import app, db
 from models import User, Client, Container, Shipment, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage, AirFreightPackage, AirFreightClient, AirFreightProduct, AirFreightUser
 from werkzeug.security import generate_password_hash
 

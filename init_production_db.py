@@ -38,10 +38,31 @@ def init_production_database():
         # Initialize Air Freight system
         print("\nInitializing Air Freight system...")
         try:
-            from init_air_freight_admin import create_air_freight_admin
-            create_air_freight_admin()
+            # Check if air freight admin exists
+            air_admin = AirFreightUser.query.filter_by(username='airadmin').first()
+            
+            if not air_admin:
+                print("Creating Air Freight admin user...")
+                air_admin = AirFreightUser(
+                    username='airadmin',
+                    password=generate_password_hash('airadmin123'),
+                    role='Admin',
+                    full_name='Air Freight Administrator',
+                    email='admin@airfreight.com',
+                    is_active=True
+                )
+                db.session.add(air_admin)
+                db.session.commit()
+                print("✅ Air Freight admin created!")
+                print("   Username: airadmin")
+                print("   Password: airadmin123")
+                print("   ⚠️  Change this password after first login!")
+            else:
+                print("✅ Air Freight admin already exists.")
         except Exception as e:
-            print(f"Warning: Could not initialize Air Freight admin: {e}")
+            print(f"❌ Error initializing Air Freight admin: {e}")
+            import traceback
+            traceback.print_exc()
         
         print("\n✅ Database initialization complete!")
         print("\nExisting tables:")

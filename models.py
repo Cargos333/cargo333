@@ -258,3 +258,66 @@ class CourierBilletage(db.Model):
     
     # Relationships
     counted_by_user = db.relationship('User', foreign_keys=[counted_by])
+
+# Air Freight Models
+class AirFreightPackage(db.Model):
+    """Package for air freight"""
+    id = db.Column(db.Integer, primary_key=True)
+    package_number = db.Column(db.String(50), unique=True, nullable=False)
+    mark = db.Column(db.String(100), nullable=False)  # Mark written on the carton
+    delivered = db.Column(db.Boolean, default=False, nullable=False)  # Delivery status
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Photo of the package
+    photo_filename = db.Column(db.String(255), nullable=True)
+    photo_data = db.Column(db.LargeBinary, nullable=True)
+    photo_mime = db.Column(db.String(50), nullable=True)
+    
+    # Relationships
+    clients = db.relationship('AirFreightClient', backref='package', lazy=True, cascade='all, delete-orphan')
+
+class AirFreightClient(db.Model):
+    """Client within an air freight package"""
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('air_freight_package.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    mark = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20))
+    delivered = db.Column(db.Boolean, default=False, nullable=False)  # Delivery status for this client
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    products = db.relationship('AirFreightProduct', backref='client', lazy=True, cascade='all, delete-orphan')
+
+class AirFreightProduct(db.Model):
+    """Product within an air freight client"""
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('air_freight_client.id'), nullable=False)
+    reference = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    quantity = db.Column(db.Integer, nullable=False)
+    weight = db.Column(db.Float)  # in kg
+    dimensions = db.Column(db.String(100))  # L x W x H
+    value = db.Column(db.Float)  # freight price in AED
+    freight_paid = db.Column(db.Boolean, default=False)  # whether freight is paid
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Photo of the product
+    photo_filename = db.Column(db.String(255), nullable=True)
+    photo_data = db.Column(db.LargeBinary, nullable=True)
+    photo_mime = db.Column(db.String(50), nullable=True)
+
+class AirFreightUser(UserMixin, db.Model):
+    """Separate user model for air freight system"""
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='Employee')  # Admin, Employee
+    full_name = db.Column(db.String(100))
+    email = db.Column(db.String(120))
+    phone = db.Column(db.String(20))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+    def is_admin(self):
+        return self.role == 'Admin'

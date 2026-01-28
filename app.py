@@ -1,10 +1,11 @@
-from flask import render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import render_template, request, redirect, url_for, flash, send_file, jsonify, session
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from functools import wraps
 import base64
 from db_config import app, db
-from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage
+from models import Container, Client, Shipment, User, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage, AirFreightPackage, AirFreightClient, AirFreightProduct, AirFreightUser
 from decorators import admin_required, secretary_required, manager_required
 from utils import format_number
 import pandas as pd
@@ -47,7 +48,19 @@ app.jinja_env.filters['format_number'] = format_number
 
 @login_manager.user_loader
 def load_user(user_id):
+    # Check if this is an air freight user (we'll use a session variable to distinguish)
+    if session.get('air_freight_user'):
+        return db.session.get(AirFreightUser, int(user_id))
     return db.session.get(User, int(user_id))
+
+def air_freight_login_required(f):
+    """Decorator to require air freight user login"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not isinstance(current_user, AirFreightUser):
+            return redirect(url_for('air_freight_login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 @app.context_processor
@@ -150,8 +163,9 @@ def dashboard():
                          destinations=DESTINATIONS)
 
 @app.route('/container/<int:id>')
+@app.route('/container/<int:id>/client/<int:client_id>')
 @login_required
-def container_details(id):
+def container_details(id, client_id=None):
     # Load container
     container = Container.query.get_or_404(id)
     
@@ -163,7 +177,7 @@ def container_details(id):
     
     # Provide container-specific tonne->m3 conversion to the template
     container_tonne_to_m3 = get_tonne_to_m3_for_container(container.container_type)
-    return render_template('container_details.html', container=container, TONNE_TO_M3=TONNE_TO_M3, container_tonne_to_m3=container_tonne_to_m3)
+    return render_template('container_details.html', container=container, TONNE_TO_M3=TONNE_TO_M3, container_tonne_to_m3=container_tonne_to_m3, highlight_client_id=client_id)
 
 @app.route('/container/<int:id>/upload-documents', methods=['POST'])
 @login_required
@@ -1357,7 +1371,12 @@ def add_product(id):
         db.session.add(product)
         db.session.commit()
 
-        return redirect(url_for('client_products', id=id))
+        # Preserve container_id in redirect if it was provided
+        container_id = request.form.get('container_id', type=int)
+        if container_id:
+            return redirect(url_for('client_products', id=id, container_id=container_id))
+        else:
+            return redirect(url_for('client_products', id=id))
     except Exception as e:
         db.session.rollback()
         return f"Error adding product: {str(e)}", 400
@@ -1419,7 +1438,13 @@ def edit_product(id):
             product.volume = product.length * product.width * product.height * product.quantity
 
         db.session.commit()
-        return redirect(url_for('client_products', id=product.client_id))
+        
+        # Preserve container_id in redirect if it was provided
+        container_id = request.form.get('container_id', type=int)
+        if container_id:
+            return redirect(url_for('client_products', id=product.client_id, container_id=container_id))
+        else:
+            return redirect(url_for('client_products', id=product.client_id))
     except Exception as e:
         db.session.rollback()
         return f"Error editing product: {str(e)}", 400
@@ -1432,7 +1457,13 @@ def delete_product(id):
     try:
         db.session.delete(product)
         db.session.commit()
-        return redirect(url_for('client_products', id=client_id))
+        
+        # Preserve container_id in redirect if it was provided
+        container_id = request.form.get('container_id', type=int)
+        if container_id:
+            return redirect(url_for('client_products', id=client_id, container_id=container_id))
+        else:
+            return redirect(url_for('client_products', id=client_id))
     except Exception as e:
         db.session.rollback()
         return f"Error deleting product: {str(e)}", 400
@@ -1469,7 +1500,12 @@ def delete_multiple_products(client_id):
         db.session.rollback()
         flash(f'Error deleting products: {str(e)}')
     
-    return redirect(url_for('client_products', id=client_id))
+    # Preserve container_id in redirect if it was provided
+    container_id = request.form.get('container_id', type=int)
+    if container_id:
+        return redirect(url_for('client_products', id=client_id, container_id=container_id))
+    else:
+        return redirect(url_for('client_products', id=client_id))
 
 @app.route('/download-template')
 @login_required
@@ -1987,7 +2023,8 @@ def search_clients():
         Container.status.label('container_status'),
         Shipment.volume,
         Shipment.payment_status,
-        Shipment.paid_amount
+        Shipment.paid_amount,
+        Shipment.id.label('shipment_id')
     ).join(
         Shipment, Client.id == Shipment.client_id
     ).join(
@@ -2014,7 +2051,8 @@ def search_clients():
             'container_id': result.container_id,
             'container_status': result.container_status,
             'volume': round(result.volume, 2),
-            'payment_status': result.payment_status
+            'payment_status': result.payment_status,
+            'shipment_id': result.shipment_id
         })
     
     return jsonify(formatted_results)
@@ -3379,7 +3417,549 @@ def approve_all_courier_items(courier_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# Air Freight Routes
+@app.route('/air-freight/login', methods=['GET', 'POST'])
+def air_freight_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = AirFreightUser.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password, password) and user.is_active:
+            session['air_freight_user'] = True
+            login_user(user)
+            return redirect(url_for('air_freight_dashboard'))
+        else:
+            flash('Invalid username or password')
+    
+    return render_template('air_freight/login.html')
+
+@app.route('/air-freight/logout', methods=['POST'])
+@air_freight_login_required
+def air_freight_logout():
+    session.pop('air_freight_user', None)
+    logout_user()
+    return redirect(url_for('air_freight_login'))
+
+def generate_air_freight_package_number():
+    """Generate a unique package number for air freight packages.
+    Format: AF + YYYY + MM + 4-digit sequential number
+    Example: AF2026010001
+    """
+    from datetime import datetime
+    
+    # Get current year and month
+    now = datetime.now()
+    year_month = now.strftime('%Y%m')
+    
+    # Find the highest package number for this month
+    prefix = f"AF{year_month}"
+    
+    # Query existing packages with this prefix
+    existing_packages = AirFreightPackage.query.filter(
+        AirFreightPackage.package_number.like(f"{prefix}%")
+    ).all()
+    
+    # Extract the sequential numbers
+    sequential_numbers = []
+    for package in existing_packages:
+        try:
+            # Extract the last 4 digits after the prefix
+            suffix = package.package_number[len(prefix):]
+            if suffix.isdigit() and len(suffix) == 4:
+                sequential_numbers.append(int(suffix))
+        except (ValueError, IndexError):
+            continue
+    
+    # Get the next sequential number
+    if sequential_numbers:
+        next_number = max(sequential_numbers) + 1
+    else:
+        next_number = 1
+    
+    # Format with leading zeros to make it 4 digits
+    return f"{prefix}{next_number:04d}"
+
+@app.route('/air-freight/dashboard')
+@air_freight_login_required
+def air_freight_dashboard():
+    packages = AirFreightPackage.query.filter_by(delivered=False).order_by(AirFreightPackage.created_at.desc()).all()
+    
+    # Prepare photo URLs for packages
+    for package in packages:
+        if package.photo_data:
+            package.photo_url = f"data:{package.photo_mime};base64,{base64.b64encode(package.photo_data).decode()}"
+        else:
+            package.photo_url = None
+    
+    return render_template('air_freight/dashboard.html', packages=packages)
+
+@app.route('/air-freight/add-package', methods=['GET', 'POST'])
+@air_freight_login_required
+def add_air_freight_package():
+    if request.method == 'POST':
+        # Generate package number automatically
+        package_number = generate_air_freight_package_number()
+        mark = request.form.get('mark')
+        
+        # Handle photo upload
+        photo_data = None
+        photo_filename = None
+        photo_mime = None
+        
+        if 'photo' in request.files:
+            photo_file = request.files['photo']
+            if photo_file and photo_file.filename:
+                photo_data = photo_file.read()
+                photo_filename = photo_file.filename
+                photo_mime = photo_file.mimetype
+        
+        new_package = AirFreightPackage(
+            package_number=package_number,
+            mark=mark,
+            photo_data=photo_data,
+            photo_filename=photo_filename,
+            photo_mime=photo_mime
+        )
+        
+        db.session.add(new_package)
+        db.session.commit()
+        
+        flash('Package added successfully!', 'success')
+        return redirect(url_for('air_freight_dashboard'))
+    
+    # Generate preview package number for GET request
+    preview_package_number = generate_air_freight_package_number()
+    return render_template('air_freight/add_package.html', preview_package_number=preview_package_number)
+
+@app.route('/air-freight/package/<int:package_id>')
+@air_freight_login_required
+def air_freight_package_details(package_id):
+    package = AirFreightPackage.query.get_or_404(package_id)
+    
+    # Prepare photo URL for package
+    if package.photo_data:
+        package.photo_url = f"data:{package.photo_mime};base64,{base64.b64encode(package.photo_data).decode()}"
+    else:
+        package.photo_url = None
+    
+    return render_template('air_freight/package_details.html', package=package)
+
+@app.route('/air-freight/package/<int:package_id>/add-client', methods=['GET', 'POST'])
+@air_freight_login_required
+def add_air_freight_client(package_id):
+    package = AirFreightPackage.query.get_or_404(package_id)
+    
+    # Prevent adding clients to delivered packages
+    if package.delivered:
+        flash('Cannot add clients to delivered packages.', 'warning')
+        return redirect(url_for('air_freight_package_details', package_id=package_id))
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        mark = request.form.get('mark')
+        phone = request.form.get('phone')
+        
+        new_client = AirFreightClient(
+            package_id=package_id,
+            name=name,
+            mark=mark,
+            phone=phone
+        )
+        
+        db.session.add(new_client)
+        db.session.commit()
+        
+        flash('Client added successfully!', 'success')
+        return redirect(url_for('air_freight_package_details', package_id=package_id))
+    
+    return render_template('air_freight/add_client.html', package=package)
+
+@app.route('/air-freight/package/<int:package_id>/edit', methods=['GET', 'POST'])
+@air_freight_login_required
+def edit_air_freight_package(package_id):
+    package = AirFreightPackage.query.get_or_404(package_id)
+    
+    if request.method == 'POST':
+        package.mark = request.form.get('mark')
+        
+        # Handle photo upload
+        if 'photo' in request.files:
+            photo_file = request.files['photo']
+            if photo_file and photo_file.filename:
+                package.photo_data = photo_file.read()
+                package.photo_filename = photo_file.filename
+                package.photo_mime = photo_file.mimetype
+        
+        db.session.commit()
+        flash('Package updated successfully!', 'success')
+        return redirect(url_for('air_freight_dashboard'))
+    
+    # Prepare photo URL for display
+    if package.photo_data:
+        package.photo_url = f"data:{package.photo_mime};base64,{base64.b64encode(package.photo_data).decode()}"
+    else:
+        package.photo_url = None
+    
+    return render_template('air_freight/edit_package.html', package=package)
+
+@app.route('/air-freight/package/<int:package_id>/toggle-delivery', methods=['POST'])
+@air_freight_login_required
+def toggle_air_freight_package_delivery(package_id):
+    package = AirFreightPackage.query.get_or_404(package_id)
+    package.delivered = not package.delivered
+    db.session.commit()
+    
+    status = "delivered" if package.delivered else "in transit"
+    flash(f'Package marked as {status}!', 'success')
+    return redirect(url_for('air_freight_dashboard'))
+
+@app.route('/air-freight/package/<int:package_id>/delete', methods=['POST'])
+@air_freight_login_required
+def delete_air_freight_package(package_id):
+    package = AirFreightPackage.query.get_or_404(package_id)
+    db.session.delete(package)
+    db.session.commit()
+    flash('Package deleted successfully!', 'success')
+    return redirect(url_for('air_freight_dashboard'))
+
+@app.route('/air-freight/client/<int:client_id>')
+@air_freight_login_required
+def air_freight_client_details(client_id):
+    client = AirFreightClient.query.get_or_404(client_id)
+    
+    # Prepare photo URLs for products
+    for product in client.products:
+        if product.photo_data:
+            product.photo_url = f"data:{product.photo_mime};base64,{base64.b64encode(product.photo_data).decode()}"
+        else:
+            product.photo_url = None
+    
+    return render_template('air_freight/client_details.html', client=client)
+
+@app.route('/air-freight/client/<int:client_id>/print')
+@air_freight_login_required
+def air_freight_client_print(client_id):
+    from datetime import datetime
+    client = AirFreightClient.query.get_or_404(client_id)
+    return render_template('air_freight/client_print.html', client=client, now=datetime.now())
+
+@app.route('/air-freight/client/<int:client_id>/add-product', methods=['GET', 'POST'])
+@air_freight_login_required
+def add_air_freight_product(client_id):
+    client = AirFreightClient.query.get_or_404(client_id)
+    
+    # Prevent adding products to clients of delivered packages
+    if client.package.delivered:
+        flash('Cannot add products to clients of delivered packages.', 'warning')
+        return redirect(url_for('air_freight_client_details', client_id=client_id))
+    
+    if request.method == 'POST':
+        reference = request.form.get('reference')
+        quantity = int(request.form.get('quantity', 1))
+        weight = float(request.form.get('weight', 0))
+        freight_price_aed = float(request.form.get('freight_price_aed', 0))
+        freight_paid = request.form.get('freight_paid') == 'on'
+        
+        # Handle photo upload
+        photo_data = None
+        photo_filename = None
+        photo_mime = None
+        
+        if 'photo' in request.files:
+            photo_file = request.files['photo']
+            if photo_file and photo_file.filename:
+                photo_data = photo_file.read()
+                photo_filename = photo_file.filename
+                photo_mime = photo_file.mimetype
+        
+        new_product = AirFreightProduct(
+            client_id=client_id,
+            reference=reference,
+            quantity=quantity,
+            weight=weight,
+            value=freight_price_aed,  # Using value field for freight price in AED
+            freight_paid=freight_paid,
+            photo_data=photo_data,
+            photo_filename=photo_filename,
+            photo_mime=photo_mime
+        )
+        
+        db.session.add(new_product)
+        db.session.commit()
+        
+        flash('Product added successfully!', 'success')
+        return redirect(url_for('air_freight_client_details', client_id=client_id))
+    
+    return render_template('air_freight/add_product.html', client=client)
+
+@app.route('/air-freight/client/<int:client_id>/edit', methods=['GET', 'POST'])
+@air_freight_login_required
+def edit_air_freight_client(client_id):
+    client = AirFreightClient.query.get_or_404(client_id)
+    
+    # Prevent editing clients of delivered packages
+    if client.package.delivered:
+        flash('Cannot edit clients of delivered packages.', 'warning')
+        return redirect(url_for('air_freight_package_details', package_id=client.package_id))
+    
+    if request.method == 'POST':
+        client.name = request.form.get('name')
+        client.mark = request.form.get('mark')
+        client.phone = request.form.get('phone')
+        
+        db.session.commit()
+        
+        flash('Client updated successfully!', 'success')
+        return redirect(url_for('air_freight_package_details', package_id=client.package_id))
+    
+    return render_template('air_freight/edit_client.html', client=client)
+
+@app.route('/air-freight/client/<int:client_id>/delete', methods=['POST'])
+@air_freight_login_required
+def delete_air_freight_client(client_id):
+    client = AirFreightClient.query.get_or_404(client_id)
+    package_id = client.package_id
+    
+    # Prevent deleting clients of delivered packages
+    if client.package.delivered:
+        flash('Cannot delete clients of delivered packages.', 'warning')
+        return redirect(url_for('air_freight_package_details', package_id=package_id))
+    
+    try:
+        # Delete all products associated with this client first
+        AirFreightProduct.query.filter_by(client_id=client_id).delete()
+        
+        # Delete the client
+        db.session.delete(client)
+        db.session.commit()
+        
+        flash('Client and all associated products deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting client: {str(e)}', 'danger')
+    
+    return redirect(url_for('air_freight_package_details', package_id=package_id))
+
+@app.route('/air-freight/client/<int:client_id>/confirm-delivery', methods=['POST'])
+@air_freight_login_required
+def confirm_client_delivery(client_id):
+    client = AirFreightClient.query.get_or_404(client_id)
+    package_id = client.package_id
+    
+    # Toggle the delivery status
+    client.delivered = not client.delivered
+    db.session.commit()
+    
+    status_text = "delivered" if client.delivered else "marked as in transit"
+    flash(f'Client {client.name} has been {status_text}!', 'success')
+    
+    return redirect(url_for('air_freight_package_details', package_id=package_id))
+
+@app.route('/air-freight/product/<int:product_id>/edit', methods=['GET', 'POST'])
+@air_freight_login_required
+def edit_air_freight_product(product_id):
+    product = AirFreightProduct.query.get_or_404(product_id)
+    
+    # Prevent editing products of delivered packages
+    if product.client.package.delivered:
+        flash('Cannot edit products of delivered packages.', 'warning')
+        return redirect(url_for('air_freight_client_details', client_id=product.client_id))
+    
+    if request.method == 'POST':
+        product.reference = request.form.get('reference')
+        product.quantity = int(request.form.get('quantity', 1))
+        product.weight = float(request.form.get('weight', 0))
+        product.value = float(request.form.get('freight_price_aed', 0))  # Using value field for freight price in AED
+        product.freight_paid = request.form.get('freight_paid') == 'on'
+        
+        # Handle photo upload (optional - keep existing if no new photo)
+        if 'photo' in request.files:
+            photo_file = request.files['photo']
+            if photo_file and photo_file.filename:
+                product.photo_data = photo_file.read()
+                product.photo_filename = photo_file.filename
+                product.photo_mime = photo_file.mimetype
+        
+        db.session.commit()
+        
+        flash('Product updated successfully!', 'success')
+        return redirect(url_for('air_freight_client_details', client_id=product.client_id))
+    
+    return render_template('air_freight/edit_product.html', product=product)
+
+@app.route('/air-freight/product/<int:product_id>/delete', methods=['POST'])
+@air_freight_login_required
+def delete_air_freight_product(product_id):
+    product = AirFreightProduct.query.get_or_404(product_id)
+    client_id = product.client_id
+    
+    # Prevent deleting products of delivered packages
+    if product.client.package.delivered:
+        flash('Cannot delete products of delivered packages.', 'warning')
+        return redirect(url_for('air_freight_client_details', client_id=client_id))
+    
+    try:
+        db.session.delete(product)
+        db.session.commit()
+        
+        flash('Product deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting product: {str(e)}', 'danger')
+    
+    return redirect(url_for('air_freight_client_details', client_id=client_id))
+
+# Air Freight User Management Routes
+@app.route('/air-freight/users')
+@air_freight_login_required
+def air_freight_users():
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('air_freight_dashboard'))
+    
+    users = AirFreightUser.query.order_by(AirFreightUser.created_at.desc()).all()
+    return render_template('air_freight/users.html', users=users)
+
+@app.route('/air-freight/users/add', methods=['GET', 'POST'])
+@air_freight_login_required
+def add_air_freight_user():
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('air_freight_dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        role = request.form.get('role', 'Employee')
+        full_name = request.form.get('full_name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        
+        # Check if username already exists
+        existing_user = AirFreightUser.query.filter_by(username=username).first()
+        if existing_user:
+            flash('Username already exists!', 'danger')
+            return redirect(url_for('add_air_freight_user'))
+        
+        # Create new user
+        hashed_password = generate_password_hash(password)
+        new_user = AirFreightUser(
+            username=username,
+            password=hashed_password,
+            role=role,
+            full_name=full_name,
+            email=email,
+            phone=phone
+        )
+        
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            flash('User created successfully!', 'success')
+            return redirect(url_for('air_freight_users'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating user: {str(e)}', 'danger')
+    
+    return render_template('air_freight/add_user.html')
+
+@app.route('/air-freight/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@air_freight_login_required
+def edit_air_freight_user(user_id):
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('air_freight_dashboard'))
+    
+    user = AirFreightUser.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        # Check if username is being changed and if it's already taken
+        new_username = request.form.get('username')
+        if new_username != user.username:
+            existing_user = AirFreightUser.query.filter_by(username=new_username).first()
+            if existing_user:
+                flash('Username already exists!', 'danger')
+                return redirect(url_for('edit_air_freight_user', user_id=user_id))
+        
+        # Update user information
+        user.username = new_username
+        password = request.form.get('password')
+        if password:  # Only update password if provided
+            user.password = generate_password_hash(password)
+        user.role = request.form.get('role', 'Employee')
+        user.full_name = request.form.get('full_name')
+        user.email = request.form.get('email')
+        user.phone = request.form.get('phone')
+        user.is_active = request.form.get('is_active') == 'on'
+        
+        try:
+            db.session.commit()
+            flash('User updated successfully!', 'success')
+            return redirect(url_for('air_freight_users'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating user: {str(e)}', 'danger')
+    
+    return render_template('air_freight/edit_user.html', user=user)
+
+@app.route('/air-freight/users/<int:user_id>/delete', methods=['POST'])
+@air_freight_login_required
+def delete_air_freight_user(user_id):
+    if not current_user.is_admin():
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('air_freight_dashboard'))
+    
+    user = AirFreightUser.query.get_or_404(user_id)
+    
+    # Prevent deleting yourself
+    if user.id == current_user.id:
+        flash('You cannot delete your own account!', 'danger')
+        return redirect(url_for('air_freight_users'))
+    
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash('User deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting user: {str(e)}', 'danger')
+    
+    return redirect(url_for('air_freight_users'))
+
+@app.route('/air-freight/history')
+@air_freight_login_required
+def air_freight_history():
+    # Get all delivered packages ordered by delivery date (most recent first)
+    delivered_packages = AirFreightPackage.query.filter_by(delivered=True).order_by(AirFreightPackage.created_at.desc()).all()
+    
+    # Prepare photo URLs for packages
+    for package in delivered_packages:
+        if package.photo_data:
+            package.photo_url = f"data:{package.photo_mime};base64,{base64.b64encode(package.photo_data).decode()}"
+        else:
+            package.photo_url = None
+    
+    return render_template('air_freight/history.html', packages=delivered_packages)
+
+def init_air_freight_admin():
+    """Initialize default admin user for air freight system"""
+    admin_user = AirFreightUser.query.filter_by(username='admin').first()
+    if not admin_user:
+        hashed_password = generate_password_hash('admin123')
+        admin_user = AirFreightUser(
+            username='admin',
+            password=hashed_password,
+            role='Admin',
+            full_name='Air Freight Administrator',
+            email='admin@airfreight.com'
+        )
+        db.session.add(admin_user)
+        db.session.commit()
+        print("Default air freight admin user created: username='admin', password='admin123'")
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        init_air_freight_admin()
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5002)))

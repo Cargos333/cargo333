@@ -2075,5 +2075,31 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// Highlight and scroll to specific client if highlight_client_id is provided
+{% if highlight_client_id %}
+document.addEventListener('DOMContentLoaded', function() {
+    const targetRow = document.querySelector(`tr[data-shipment-id="{{ highlight_client_id }}"]`);
+    if (targetRow) {
+        // Highlight the row
+        targetRow.style.backgroundColor = '#fff3cd';
+        targetRow.style.border = '2px solid #ffc107';
+        targetRow.style.boxShadow = '0 0 10px rgba(255, 193, 7, 0.3)';
+        
+        // Scroll to the row
+        targetRow.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
+        
+        // Remove highlight after 3 seconds
+        setTimeout(function() {
+            targetRow.style.backgroundColor = '';
+            targetRow.style.border = '';
+            targetRow.style.boxShadow = '';
+        }, 3000);
+    }
+});
+{% endif %}
+
 </script>
 {% endblock %}

@@ -108,6 +108,9 @@
                     </div>
                     <!-- Price per tonne is intentionally hidden for Products (we only capture tonnage) -->
                 </div>
+                {% if container_id %}
+                <input type="hidden" name="container_id" value="{{ container_id }}">
+                {% endif %}
                 <button type="submit" class="btn btn-primary">Add Product</button>
             </form>
         </div>
@@ -230,6 +233,9 @@
                                     <button type="button" class="btn btn-secondary btn-sm edit-mode d-none btn-cancel" data-product-id="{{ product.id }}">Cancel</button>
                                     <form action="{{ url_for('delete_product', id=product.id) }}" method="POST" class="d-inline" 
                                           onsubmit="return confirm('Are you sure you want to delete this product?');">
+                                        {% if container_id %}
+                                        <input type="hidden" name="container_id" value="{{ container_id }}">
+                                        {% endif %}
                                         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                                     </form>
                                 </div>
@@ -434,12 +440,22 @@ function saveProduct(productId) {
         if (el.name) formData.append(el.name, el.value);
     });
     
+    // Include container_id if available
+    {% if container_id %}
+    formData.append('container_id', '{{ container_id }}');
+    {% endif %}
+    
     fetch(`/product/${productId}/edit`, {
         method: 'POST',
         body: formData
     }).then(response => {
         if (response.ok) {
+            // Preserve container_id in the URL after reload
+            {% if container_id %}
+            window.location.href = window.location.pathname + '?container_id={{ container_id }}';
+            {% else %}
             window.location.reload();
+            {% endif %}
         } else {
             alert('Error updating product');
         }
@@ -673,6 +689,15 @@ function deleteSelected() {
         idsInput.name = 'product_ids';
         idsInput.value = selectedIds.join(',');
         form.appendChild(idsInput);
+        
+        // Add container_id if available
+        {% if container_id %}
+        const containerInput = document.createElement('input');
+        containerInput.type = 'hidden';
+        containerInput.name = 'container_id';
+        containerInput.value = '{{ container_id }}';
+        form.appendChild(containerInput);
+        {% endif %}
         
         // Submit the form
         document.body.appendChild(form);

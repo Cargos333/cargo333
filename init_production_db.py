@@ -3,7 +3,7 @@ Initialize production database on Render.com
 Run this script once after deployment to create all tables
 """
 from app import app, db
-from models import User, Client, Container, Shipment, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage
+from models import User, Client, Container, Shipment, Product, ContainerDocument, Courier, CourierItem, FinanceRecord, Billetage, CourierBilletage, AirFreightPackage, AirFreightClient, AirFreightProduct, AirFreightUser
 from werkzeug.security import generate_password_hash
 
 def init_production_database():
@@ -34,6 +34,14 @@ def init_production_database():
             print("⚠️  IMPORTANT: Change this password immediately after first login!")
         else:
             print("Admin user already exists.")
+        
+        # Initialize Air Freight system
+        print("\nInitializing Air Freight system...")
+        try:
+            from init_air_freight_admin import create_air_freight_admin
+            create_air_freight_admin()
+        except Exception as e:
+            print(f"Warning: Could not initialize Air Freight admin: {e}")
         
         print("\n✅ Database initialization complete!")
         print("\nExisting tables:")

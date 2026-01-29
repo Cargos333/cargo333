@@ -190,6 +190,10 @@
                                                         <input type="text" class="form-control" value="AED {{ shipment.paid_amount|format_number }}" disabled>
                                                     </div>
                                                     <div class="mb-3">
+                                                        <label class="form-label">Outstanding (AED)</label>
+                                                        <input type="text" class="form-control" value="AED {{ (shipment.total_price - shipment.paid_amount)|format_number }}" disabled>
+                                                    </div>
+                                                    <div class="mb-3">
                                                         <label for="paid_amount_{{ shipment.id }}" class="form-label">New Payment Amount (AED)</label>
                                                         <input type="number" step="0.01" class="form-control" id="paid_amount_{{ shipment.id }}" 
                                                                name="paid_amount" value="{{ shipment.paid_amount }}" 
@@ -233,6 +237,13 @@
     .card-header {
         padding: 1rem;
         border-bottom: 2px solid #dee2e6;
+    }
+
+    /* Dark mode styling for Update Payment modal fields */
+    [data-theme="dark"] .modal-body .form-control[disabled]:nth-of-type(1),
+    [data-theme="dark"] .modal-body .form-control[disabled]:nth-of-type(2),
+    [data-theme="dark"] .modal-body .form-control[disabled]:nth-of-type(3) {
+        color: black !important;
     }
 </style>
 {% endblock %}

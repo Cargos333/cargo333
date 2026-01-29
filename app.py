@@ -2909,7 +2909,24 @@ def couriers():
 def create_courier():
     """Create a new courier"""
     try:
-        courier_id = request.form.get('courier_id')
+        # Auto-generate courier_id
+        # Find the highest existing courier_id number
+        existing_couriers = Courier.query.all()
+        max_id = 0
+        for courier in existing_couriers:
+            try:
+                # Extract number from courier_id (remove leading zeros and convert to int)
+                courier_num = int(courier.courier_id.lstrip('0'))
+                if courier_num > max_id:
+                    max_id = courier_num
+            except ValueError:
+                # Skip if courier_id is not a number
+                continue
+        
+        # Generate next courier_id with leading zeros (001, 002, etc.)
+        next_id = max_id + 1
+        courier_id = f"{next_id:03d}"
+        
         date_str = request.form.get('date')
         # Additional fields
         brought_by_name = request.form.get('brought_by_name')
@@ -2946,6 +2963,33 @@ def create_courier():
         db.session.rollback()
         flash(f'Error creating courier: {str(e)}', 'danger')
         return redirect(url_for('couriers'))
+
+@app.route('/courier/next-id', methods=['GET'])
+@login_required
+def get_next_courier_id():
+    """Get the next auto-generated courier ID"""
+    try:
+        # Find the highest existing courier_id number
+        existing_couriers = Courier.query.all()
+        max_id = 0
+        for courier in existing_couriers:
+            try:
+                # Extract number from courier_id (remove leading zeros and convert to int)
+                courier_num = int(courier.courier_id.lstrip('0'))
+                if courier_num > max_id:
+                    max_id = courier_num
+            except ValueError:
+                # Skip if courier_id is not a number
+                continue
+        
+        # Generate next courier_id with leading zeros (001, 002, etc.)
+        next_id = max_id + 1
+        courier_id = f"{next_id:03d}"
+        
+        return jsonify({'success': True, 'courier_id': courier_id})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/courier/<int:id>')
 @login_required
@@ -3358,11 +3402,11 @@ def check_courier_approved(id):
 @app.route('/courier/<int:courier_id>/item/<int:item_id>/approve', methods=['POST'])
 @login_required
 def approve_courier_item(courier_id, item_id):
-    """Secretary approves receiving a courier item and enters market exchange rate"""
+    """Secretary or Admin approves receiving a courier item and enters market exchange rate"""
     try:
-        # Only secretaries can approve
-        if current_user.role != 'Secretary':
-            return jsonify({'success': False, 'message': 'Only secretaries can approve courier items'}), 403
+        # Only secretaries and admins can approve
+        if current_user.role not in ['Secretary', 'Admin']:
+            return jsonify({'success': False, 'message': 'Only secretaries and admins can approve courier items'}), 403
         
         item = CourierItem.query.get_or_404(item_id)
         
@@ -3390,11 +3434,11 @@ def approve_courier_item(courier_id, item_id):
 @app.route('/courier/<int:courier_id>/approve-all', methods=['POST'])
 @login_required
 def approve_all_courier_items(courier_id):
-    """Secretary approves all courier items at once with market exchange rate (only once)"""
+    """Secretary or Admin approves all courier items at once with market exchange rate (only once)"""
     try:
-        # Only secretaries can approve
-        if current_user.role != 'Secretary':
-            return jsonify({'success': False, 'message': 'Only secretaries can approve courier items'}), 403
+        # Only secretaries and admins can approve
+        if current_user.role not in ['Secretary', 'Admin']:
+            return jsonify({'success': False, 'message': 'Only secretaries and admins can approve courier items'}), 403
         
         courier = Courier.query.get_or_404(courier_id)
         

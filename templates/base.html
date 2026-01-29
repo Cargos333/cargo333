@@ -536,6 +536,13 @@
             font-size: 1.5rem;
             font-weight: bold;
             color: white;
+            display: block;
+            transition: color 0.3s ease;
+            text-decoration: none;
+        }
+        
+        #sidebar-wrapper .sidebar-heading:hover {
+            color: rgba(255, 255, 255, 0.8);
         }
         
         #sidebar-wrapper .list-group {
@@ -638,6 +645,18 @@
         .mobile-top-bar span {
             font-weight: 600;
             font-size: 1.1rem;
+            color: white;
+            transition: color 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .mobile-top-bar a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        .mobile-top-bar a:hover {
+            color: rgba(255, 255, 255, 0.8) !important;
         }
         
         /* Overlay for mobile sidebar */
@@ -741,7 +760,7 @@
     <div class="d-flex" id="wrapper">
         <!-- Sidebar -->
         <div id="sidebar-wrapper">
-            <div class="sidebar-heading">CARGO 333</div>
+            <a href="/" class="sidebar-heading">CARGO 333</a>
             
             <!-- Dark Mode Toggle -->
             <div class="px-3 py-2">
@@ -831,7 +850,7 @@
                 <button class="btn btn-outline-light" id="menu-toggle">
                     <i class="fas fa-bars"></i>
                 </button>
-                <span>CARGO 333</span>
+                <a href="/">CARGO 333</a>
                 <div></div> <!-- Empty div for flex spacing -->
             </div>
             

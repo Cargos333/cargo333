@@ -6,7 +6,7 @@
     <!-- Statistics Cards -->
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="card bg-info text-white">
+            <div class="card bg-info-theme text-white">
                 <div class="card-body">
                     <h5 class="card-title">Containers with Unpaid Freight</h5>
                     <h2>{{ total_containers }}</h2>
@@ -14,7 +14,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-warning text-dark">
+            <div class="card bg-warning-theme text-white">
                 <div class="card-body">
                     <h5 class="card-title">Partially Paid</h5>
                     <h2>{{ partial_count }}</h2>
@@ -22,7 +22,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-danger text-white">
+            <div class="card bg-danger-theme text-white">
                 <div class="card-body">
                     <h5 class="card-title">Fully Unpaid</h5>
                     <h2>{{ unpaid_count }}</h2>
@@ -30,7 +30,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-primary text-white">
+            <div class="card bg-primary-theme text-white">
                 <div class="card-body">
                     <h5 class="card-title">Total Outstanding</h5>
                     <h2>AED {{ total_outstanding|format_number }}</h2>
@@ -83,13 +83,13 @@
         {% for item in enriched_containers %}
         <div class="col-md-12 mb-4">
             <div class="card">
-                <div class="card-header bg-light">
+                <div class="card-header bg-light-theme">
                     <div class="row align-items-center">
                         <div class="col-md-6">
                             <h5 class="mb-0">
                                 <i class="fas fa-box"></i>
                                 <a href="{{ url_for('container_details', id=item.container.id) }}" 
-                                   class="text-decoration-none">
+                                   class="text-decoration-none text-primary">
                                     {{ item.container.container_number }}
                                 </a>
                                 {% if item.container.container_name %}
@@ -112,7 +112,7 @@
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover">
-                            <thead class="table-light">
+                            <thead class="bg-light-theme">
                                 <tr>
                                     <th>Client (Mark)</th>
                                     <th>Volume (m³)</th>
@@ -153,7 +153,7 @@
                                         {% if shipment.payment_status == 'unpaid' %}
                                         <span class="badge bg-danger">Unpaid</span>
                                         {% elif shipment.payment_status == 'partial' %}
-                                        <span class="badge bg-warning text-dark">Partial</span>
+                                        <span class="badge bg-warning">Partial</span>
                                         {% endif %}
                                     </td>
                                     <td>

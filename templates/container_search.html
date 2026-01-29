@@ -350,6 +350,30 @@ function printContainerDetails() {
     .modal-body {
         padding-top: 0 !important;
     }
+    
+    /* Ensure table footer rows are readable when printing - override dark mode */
+    @media print {
+        .table-secondary,
+        .table-success {
+            background-color: #f8f9fa !important;
+            color: #000 !important;
+        }
+        
+        .table-secondary td,
+        .table-success td,
+        .table-secondary th,
+        .table-success th {
+            color: #000 !important;
+            background-color: transparent !important;
+        }
+        
+        /* Specifically target tfoot rows */
+        tfoot .table-secondary,
+        tfoot .table-success {
+            background-color: #f8f9fa !important;
+            color: #000 !important;
+        }
+    }
 }
 
 .bg-success-subtle {

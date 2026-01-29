@@ -362,7 +362,7 @@
                         </tr>
                         {% endfor %}
                         <!-- Totals Row -->
-                        <tr class="table-secondary fw-bold">
+                        <tr class="bg-light-theme fw-bold">
                             <td colspan="4">TOTAL</td>
                             <td class="amount">{{ "{:,.0f}".format(total_amount) }} EUR</td>
                             <td class="service">{{ "{:,.0f}".format(total_service) }} EUR</td>
@@ -392,7 +392,7 @@
     {% set approved_items = items|selectattr('is_received', 'equalto', True)|list %}
     {% if approved_items|length > 0 and total_money_received %}
     <div class="card mt-4">
-        <div class="card-header bg-success text-white">
+        <div class="card-header bg-success-theme text-white">
             <h5 class="mb-0"><i class="fas fa-chart-line"></i> Financial Summary</h5>
         </div>
         <div class="card-body">
@@ -424,7 +424,7 @@
     {% set is_not_approved = approved_items|length == 0 %}
     {% if has_items and is_not_approved and current_user.role not in ['Secretary', 'Manager'] and courier_billetages|length == 0 %}
     <div class="card mt-4 no-print">
-        <div class="card-header bg-warning text-dark">
+        <div class="card-header bg-warning-theme text-white">
             <h5 class="mb-0"><i class="fas fa-coins"></i> Cash Counting (Billetage)</h5>
         </div>
         <div class="card-body">
@@ -590,7 +590,7 @@
     <!-- Display Previous Billetages - Always show if there are any -->
     {% if courier_billetages %}
     <div class="card mt-4">
-        <div class="card-header bg-secondary text-white">
+        <div class="card-header bg-secondary-theme text-white">
             <h5 class="mb-0"><i class="fas fa-history"></i> Cash Count History</h5>
         </div>
         <div class="card-body">
@@ -713,7 +713,7 @@
                         <div class="col-md-6"><strong>Total Counted:</strong> {{ "{:,.0f}".format(billetage.total_counted) }} AED</div>
                         <div class="col-md-6"><strong>Expected:</strong> {{ "{:,.0f}".format(billetage.expected_amount) }} AED</div>
                         <div class="col-md-12 mt-2"><strong>Difference:</strong> 
-                            <span class="badge bg-{{ 'success' if billetage.difference == 0 else ('warning' if billetage.difference|abs < 100 else 'danger') }}">
+                            <span class="badge bg-{{ 'success' if billetage.difference == 0 else ('warning' if billetage.difference|abs < 100 else 'danger') }} text-white">
                                 {{ "{:,.0f}".format(billetage.difference) }} AED
                             </span>
                         </div>

@@ -422,6 +422,13 @@
         margin: 1.5cm;
     }
 }
+
+/* Dark mode styling for edit mode readonly inputs */
+[data-theme="dark"] .col-goods-type input.edit-mode[readonly],
+[data-theme="dark"] .col-volume-vide input.edit-mode[readonly],
+[data-theme="dark"] .col-volume input[name="volume_display"][readonly] {
+    color: black !important;
+}
 </style>
 
 <script>

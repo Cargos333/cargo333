@@ -265,6 +265,7 @@ class AirFreightPackage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     package_number = db.Column(db.String(50), unique=True, nullable=False)
     mark = db.Column(db.String(100), nullable=False)  # Mark written on the carton
+    airline = db.Column(db.String(50), nullable=True)  # Airline company: 'Ethiopian Airlines', 'Kenya Airways', 'Air Tanzania'
     delivered = db.Column(db.Boolean, default=False, nullable=False)  # Delivery status
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     

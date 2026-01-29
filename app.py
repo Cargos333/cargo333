@@ -90,6 +90,26 @@ def inject_new_courier_count():
 
     return dict(new_courier_count=new_count)
 
+
+@app.context_processor
+def inject_air_freight_package_count():
+    """Make `air_freight_package_count` available in all templates.
+
+    Counts total AirFreight packages that are not yet delivered.
+    """
+    try:
+        # If user is not authenticated or not admin, show zero
+        if not current_user or not current_user.is_authenticated or current_user.role != 'Admin':
+            return dict(air_freight_package_count=0)
+
+        from models import AirFreightPackage
+        package_count = AirFreightPackage.query.filter_by(delivered=False).count()
+    except Exception:
+        package_count = 0
+
+    return dict(air_freight_package_count=package_count)
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -3501,6 +3521,7 @@ def add_air_freight_package():
         # Generate package number automatically
         package_number = generate_air_freight_package_number()
         mark = request.form.get('mark')
+        airline = request.form.get('airline')  # New airline field
         
         # Handle photo upload
         photo_data = None
@@ -3517,6 +3538,7 @@ def add_air_freight_package():
         new_package = AirFreightPackage(
             package_number=package_number,
             mark=mark,
+            airline=airline,  # Add airline field
             photo_data=photo_data,
             photo_filename=photo_filename,
             photo_mime=photo_mime
@@ -3582,6 +3604,7 @@ def edit_air_freight_package(package_id):
     
     if request.method == 'POST':
         package.mark = request.form.get('mark')
+        package.airline = request.form.get('airline')  # Add airline field
         
         # Handle photo upload
         if 'photo' in request.files:

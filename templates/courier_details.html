@@ -267,7 +267,7 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title mb-0">Courier Items</h5>
-                {% if current_user.role == 'Secretary' %}
+                {% if current_user.role in ['Secretary', 'Admin'] %}
                     {% set approved_items = items|selectattr('is_received', 'equalto', True)|list %}
                     {% if approved_items|length == 0 and items|length > 0 %}
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveAllModal">
@@ -985,7 +985,7 @@ function deleteBilletage(billetageId, courierId) {
     </div>
 </div>
 
-<!-- Approve Item Modal (Secretary) -->
+<!-- Approve Item Modal (Secretary/Admin) -->
 <div class="modal fade" id="approveItemModal" tabindex="-1" aria-labelledby="approveItemModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -1015,7 +1015,7 @@ function deleteBilletage(billetageId, courierId) {
     </div>
 </div>
 
-<!-- Approve All Items Modal (Secretary) -->
+<!-- Approve All Items Modal (Secretary/Admin) -->
 <div class="modal fade" id="approveAllModal" tabindex="-1" aria-labelledby="approveAllModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">

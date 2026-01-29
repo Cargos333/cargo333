@@ -78,7 +78,7 @@
             {% if approved_couriers %}
             <div class="table-responsive">
                 <table class="table table-hover table-striped">
-                    <thead class="table-success">
+                    <thead class="bg-success-theme text-white">
                         <tr>
                             <th>Courier ID</th>
                             <th>Date</th>
@@ -130,7 +130,8 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="courier_id" class="form-label">Courier ID</label>
-                        <input type="text" class="form-control" id="courier_id" name="courier_id" required>
+                        <input type="text" class="form-control" id="courier_id" name="courier_id" readonly required style="color: black !important;">
+                        <small class="text-muted">Auto-generated sequential ID</small>
                     </div>
                     <div class="mb-3">
                         <label for="date" class="form-label">Date</label>
@@ -208,5 +209,23 @@ function deleteCourier(id, courierId) {
 
 // Set today's date as default
 document.getElementById('date').valueAsDate = new Date();
+
+// Auto-populate courier ID when modal opens
+document.getElementById('createCourierModal').addEventListener('show.bs.modal', function() {
+    fetch('/courier/next-id')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('courier_id').value = data.courier_id;
+            } else {
+                console.error('Error getting next courier ID:', data.error);
+                alert('Error generating courier ID. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching next courier ID:', error);
+            alert('Error generating courier ID. Please try again.');
+        });
+});
 </script>
 {% endblock %}

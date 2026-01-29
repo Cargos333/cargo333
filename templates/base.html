@@ -282,6 +282,12 @@
                     <a href="{{ url_for('employees') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('employees') else '' }}">
                         <i class="fas fa-users"></i> Employees
                     </a>
+                    <a href="{{ url_for('air_freight_login') }}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-plane"></i> Air Freight
+                        {% if air_freight_package_count and air_freight_package_count > 0 %}
+                        <span class="badge bg-primary ms-2">{{ air_freight_package_count }}</span>
+                        {% endif %}
+                    </a>
                     {% endif %}
                     
                     <a href="{{ url_for('payments_tracker') }}" class="list-group-item list-group-item-action {{ 'active' if request.path == url_for('payments_tracker') else '' }}">

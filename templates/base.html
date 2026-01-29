@@ -292,6 +292,21 @@
             color: var(--text-primary) !important;
         }
 
+        /* Ensure tfoot table-secondary rows are properly styled in dark mode */
+        [data-theme="dark"] tfoot .table-secondary,
+        [data-theme="dark"] tfoot tr.table-secondary {
+            background-color: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+        }
+
+        [data-theme="dark"] tfoot .table-secondary td,
+        [data-theme="dark"] tfoot .table-secondary th,
+        [data-theme="dark"] tfoot tr.table-secondary td,
+        [data-theme="dark"] tfoot tr.table-secondary th {
+            color: var(--text-primary) !important;
+            background-color: transparent !important;
+        }
+
         [data-theme="dark"] .table-success {
             background-color: rgba(25, 135, 84, 0.3) !important;
             color: #000 !important;

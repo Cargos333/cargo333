@@ -1746,11 +1746,6 @@ document.head.insertAdjacentHTML('beforeend', `
         color: black !important;
     }
 
-    /* Dark mode styling for Volume input field */
-    [data-theme="dark"] #volume {
-        color: black !important;
-    }
-
     /* Dark mode styling for modal input fields */
     [data-theme="dark"] #modal_client_mark {
         color: black !important;
@@ -1762,6 +1757,11 @@ document.head.insertAdjacentHTML('beforeend', `
 
     [data-theme="dark"] #modal_price {
         color: black !important;
+    }
+
+    /* Dark mode styling for uploaded document names */
+    [data-theme="dark"] .list-group-item strong {
+        color: white !important;
     }
     </style>
 `);

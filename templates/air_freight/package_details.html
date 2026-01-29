@@ -1,43 +1,45 @@
 {% extends "air_freight/base.html" %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="mb-1" style="font-weight: 700;"><i class="fas fa-box text-primary"></i> {{ package.package_number }}</h1>
-            <p class="text-muted mb-0">Package Details and Client Management
+<div class="container-fluid package-details-container">
+    <div class="d-flex justify-content-between align-items-center mb-3 mb-md-4 flex-wrap package-header">
+        <div class="package-title-wrapper">
+            <h1 class="mb-1 package-title"><i class="fas fa-box text-primary"></i> {{ package.package_number }}</h1>
+            <p class="text-muted mb-0 package-subtitle">
+                <span class="d-none d-md-inline">Package Details and Client Management</span>
+                <span class="d-md-none">Package Details</span>
                 {% if package.delivered %}
-                <span class="badge bg-success ms-2"><i class="fas fa-check-circle"></i> Delivered</span>
+                <span class="badge bg-success ms-2 package-status-badge"><i class="fas fa-check-circle"></i> Delivered</span>
                 {% endif %}
             </p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 mt-2 mt-md-0 package-actions">
             {% if not package.delivered %}
-            <a href="{{ url_for('add_air_freight_client', package_id=package.id) }}" class="btn btn-success shadow-sm">
-                <i class="fas fa-user-plus me-1"></i> Add Client
+            <a href="{{ url_for('add_air_freight_client', package_id=package.id) }}" class="btn btn-success shadow-sm btn-sm-mobile">
+                <i class="fas fa-user-plus"></i><span class="d-none d-md-inline ms-1"> Add Client</span>
             </a>
             {% endif %}
-            <a href="{{ url_for('air_freight_dashboard') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i> Back
+            <a href="{{ url_for('air_freight_dashboard') }}" class="btn btn-outline-secondary btn-sm-mobile">
+                <i class="fas fa-arrow-left"></i><span class="d-none d-md-inline ms-1"> Back</span>
             </a>
         </div>
     </div>
 
     <!-- Package Info and Stats -->
-    <div class="row g-4 mb-4">
+    <div class="row g-3 g-md-4 mb-3 mb-md-4">
         <!-- Package Information Card -->
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-gradient text-white py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <h5 class="mb-0 d-flex align-items-center">
+        <div class="col-lg-8 col-12">
+            <div class="card border-0 shadow-sm h-100 info-card">
+                <div class="card-header bg-gradient text-white py-2 py-md-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0 d-flex align-items-center card-header-title">
                         <i class="fas fa-info-circle me-2"></i> Package Information
                     </h5>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body p-3 p-md-4">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="info-list">
-                                <div class="info-item d-flex align-items-start mb-3">
+                                <div class="info-item d-flex align-items-start mb-2 mb-md-3">
                                     <div class="info-icon me-3">
                                         <i class="fas fa-barcode text-primary"></i>
                                     </div>
@@ -46,7 +48,7 @@
                                         <strong class="fs-6">{{ package.package_number }}</strong>
                                     </div>
                                 </div>
-                                <div class="info-item d-flex align-items-start mb-3">
+                                <div class="info-item d-flex align-items-start mb-2 mb-md-3">
                                     <div class="info-icon me-3">
                                         <i class="fas fa-tag text-info"></i>
                                     </div>
@@ -55,6 +57,17 @@
                                         <strong class="fs-6">{{ package.mark }}</strong>
                                     </div>
                                 </div>
+                                {% if package.airline %}
+                                <div class="info-item d-flex align-items-start mb-2 mb-md-3">
+                                    <div class="info-icon me-3">
+                                        <i class="fas fa-plane text-warning"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Airline Company</small>
+                                        <strong class="fs-6">{{ package.airline }}</strong>
+                                    </div>
+                                </div>
+                                {% endif %}
                                 <div class="info-item d-flex align-items-start">
                                     <div class="info-icon me-3">
                                         <i class="fas fa-calendar text-secondary"></i>
@@ -86,13 +99,13 @@
 
         <!-- Statistics Card -->
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-gradient text-white py-3" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                    <h5 class="mb-0 d-flex align-items-center">
+            <div class="card border-0 shadow-sm h-100 stats-card">
+                <div class="card-header bg-gradient text-white py-2 py-md-3" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <h5 class="mb-0 d-flex align-items-center card-header-title">
                         <i class="fas fa-chart-line me-2"></i> Statistics
                     </h5>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body p-3 p-md-4">
                     <div class="stat-item mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="text-muted">Clients</span>
@@ -118,11 +131,11 @@
     </div>
 
     <!-- Clients List -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white border-0 py-3">
-            <h5 class="mb-0 fw-bold"><i class="fas fa-users text-primary me-2"></i> Clients in this Package</h5>
+    <div class="card border-0 shadow-sm clients-card">
+        <div class="card-header bg-white border-0 py-2 py-md-3">
+            <h5 class="mb-0 fw-bold card-header-title"><i class="fas fa-users text-primary me-2"></i> Clients in this Package</h5>
         </div>
-        <div class="card-body p-4">
+        <div class="card-body p-2 p-md-4">
             {% if package.clients %}
                 <div class="table-responsive table-mobile-responsive">
                     <table class="table table-hover align-middle">
@@ -245,21 +258,112 @@
     .client-row-hover:hover {
         background-color: rgba(102, 126, 234, 0.05);
     }
-}
 
 /* Mobile-specific styles for package details */
 @media (max-width: 768px) {
+    .package-details-container {
+        padding: 0.5rem !important;
+    }
+    
+    .package-header {
+        gap: 0.5rem;
+    }
+    
+    .package-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+    
+    .package-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .package-status-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+    }
+    
+    .package-title-wrapper {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .package-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .btn-sm-mobile {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.875rem;
+    }
+    
+    .card-header-title {
+        font-size: 0.95rem;
+    }
+    
+    .info-card .card-body,
+    .stats-card .card-body {
+        padding: 1rem !important;
+    }
+    
+    .info-item .info-icon {
+        flex-shrink: 0;
+        margin-right: 0.75rem !important;
+        width: 32px !important;
+        height: 32px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .info-item {
+        margin-bottom: 0.75rem !important;
+        display: flex !important;
+        align-items: center !important;
+        min-height: 40px;
+    }
+    
+    .info-item small {
+        font-size: 0.75rem;
+        display: block;
+        line-height: 1.2;
+        margin-bottom: 0.1rem;
+    }
+    
+    .info-item strong {
+        font-size: 0.9rem;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+    
+    .stat-item {
+        margin-bottom: 1rem !important;
+    }
+    
+    .stat-item h2 {
+        font-size: 1.75rem;
+    }
+    
+    .clients-card .card-body {
+        padding: 0.75rem !important;
+    }
+    
+    /* Hide statistics card on mobile */
+    .col-lg-4 {
+        display: none !important;
+    }
     .client-row-hover {
         margin-bottom: 0.5rem;
     }
     
     .client-row-hover td {
-        padding: 0.5rem 0.25rem;
+        padding: 0.4rem 0.25rem;
     }
     
     .client-row-hover .badge {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
     }
     
     /* Mobile action buttons layout */
@@ -267,13 +371,18 @@
         flex-direction: row;
         flex-wrap: wrap;
         gap: 0.25rem !important;
+        justify-content: flex-start !important;
     }
     
     .d-flex.gap-2.justify-content-center .btn {
-        flex: 1;
-        min-width: 40px;
-        padding: 0.5rem;
-        font-size: 0.8rem;
+        flex: 0 0 auto;
+        min-width: 36px;
+        padding: 0.4rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    .d-flex.gap-2.justify-content-center .btn i {
+        font-size: 0.9rem;
     }
     
     /* Mobile table improvements */
@@ -289,16 +398,16 @@
         display: block;
         border: 1px solid #e9ecef;
         border-radius: 8px;
-        margin-bottom: 1rem;
-        padding: 1rem;
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
         background: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
     
     .table-mobile-responsive tbody td {
         display: block;
         border: none;
-        padding: 0.25rem 0;
+        padding: 0.2rem 0;
         text-align: left;
     }
     
@@ -320,9 +429,9 @@
     .mobile-client-card {
         background: white;
         border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         border: 1px solid #e9ecef;
     }
     
@@ -330,11 +439,11 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
     }
     
     .mobile-client-info {
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
     }
     
     .mobile-client-actions {
@@ -344,10 +453,29 @@
     }
     
     .mobile-client-actions .btn {
-        flex: 1;
-        min-width: 40px;
-        padding: 0.5rem;
-        font-size: 0.8rem;
+        flex: 0 0 auto;
+        min-width: 36px;
+        padding: 0.4rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    /* Optimize empty state for mobile */
+    .text-center.py-5 {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+    }
+    
+    .text-center.py-5 .mb-4 {
+        font-size: 2.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    .text-center.py-5 h4 {
+        font-size: 1.1rem;
+    }
+    
+    .text-center.py-5 p {
+        font-size: 0.9rem;
     }
 }
 </style>

@@ -28,6 +28,17 @@
                             <input type="text" class="form-control form-control-lg" id="mark" name="mark" value="{{ package.mark }}" required>
                         </div>
 
+                        <div class="mb-4">
+                            <label for="airline" class="form-label"><i class="fas fa-plane text-warning"></i> Airline Company</label>
+                            <select class="form-select form-select-lg" id="airline" name="airline">
+                                <option value="">Select Airline (Optional)</option>
+                                <option value="Ethiopian Airlines" {% if package.airline == 'Ethiopian Airlines' %}selected{% endif %}>Ethiopian Airlines</option>
+                                <option value="Kenya Airways" {% if package.airline == 'Kenya Airways' %}selected{% endif %}>Kenya Airways</option>
+                                <option value="Air Tanzania" {% if package.airline == 'Air Tanzania' %}selected{% endif %}>Air Tanzania</option>
+                            </select>
+                            <div class="form-text">Select the airline company for this package</div>
+                        </div>
+
                         {% if package.photo_url %}
                         <div class="mb-4">
                             <label class="form-label"><i class="fas fa-image text-info"></i> Current Photo</label>

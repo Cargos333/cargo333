@@ -107,6 +107,13 @@
                                         <span class="text-muted small me-2">Mark:</span>
                                         <strong>{{ package.mark }}</strong>
                                     </div>
+                                    {% if package.airline %}
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-plane text-warning me-2" style="width: 20px;"></i>
+                                        <span class="text-muted small me-2">Airline:</span>
+                                        <span class="badge bg-warning text-dark">{{ package.airline }}</span>
+                                    </div>
+                                    {% endif %}
                                     <div class="d-flex align-items-center mb-2">
                                         <i class="fas fa-users text-success me-2" style="width: 20px;"></i>
                                         <span class="text-muted small me-2">Clients:</span>

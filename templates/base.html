@@ -498,7 +498,7 @@
         }
         
         #sidebar-wrapper {
-            min-height: 100vh;
+            height: 100vh;
             margin-left: -15rem;
             width: 15rem;
             transition: margin 0.3s, box-shadow 0.3s;
@@ -509,6 +509,26 @@
             top: 0;
             overflow-y: auto;
             overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Custom scrollbar for sidebar */
+        #sidebar-wrapper::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        #sidebar-wrapper::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        #sidebar-wrapper::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+        
+        #sidebar-wrapper::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
         
         #sidebar-wrapper .sidebar-heading {
@@ -520,7 +540,13 @@
         
         #sidebar-wrapper .list-group {
             width: 15rem;
-            padding-bottom: 100px;
+            padding-bottom: 0;
+            flex: 1 1 auto;
+        }
+        
+        /* Custom scrollbar for sidebar */
+        #sidebar-wrapper::-webkit-scrollbar {
+            width: 6px;
         }
         
         .list-group-item {
@@ -553,11 +579,10 @@
         }
         
         .sidebar-bottom {
-            position: absolute;
-            bottom: 0;
             width: 100%;
             padding: 1rem;
             background: var(--sidebar-gradient);
+            margin-top: auto;
         }
         
         .logout-button {
@@ -693,13 +718,12 @@
             
             #sidebar-wrapper .list-group {
                 padding-bottom: 0;
+                overflow-y: auto;
             }
             
             /* Adjust logout button for mobile */
             .sidebar-bottom {
-                position: relative;
                 padding: 0.75rem;
-                margin-top: 1rem;
                 background: transparent;
             }
             

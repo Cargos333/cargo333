@@ -161,7 +161,7 @@
                                 </tr>
                                 <tr class="table-success fw-bold">
                                     <td colspan="6" class="text-end">Total Payments Received:</td>
-                                    <td colspan="2">AED {{ (selected_container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='price') + selected_container.shipments|selectattr('payment_status', 'eq', 'partial')|sum(attribute='paid_amount'))|format_number }}</td>
+                                    <td colspan="2">AED {{ (selected_container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='price') + selected_container.shipments|selectattr('payment_status', 'eq', 'paid')|sum(attribute='extra_charge') + selected_container.shipments|selectattr('payment_status', 'eq', 'partial')|sum(attribute='paid_amount'))|format_number }}</td>
                                 </tr>
                             </tfoot>
                         </table>

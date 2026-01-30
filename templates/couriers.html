@@ -35,6 +35,7 @@
                         <tr>
                             <th>Courier ID</th>
                             <th>Date</th>
+                            <th>Brought By</th>
                             <th>Items Count</th>
                             <th>Created At</th>
                             <th>Actions</th>
@@ -45,6 +46,7 @@
                         <tr>
                             <td><strong>{{ courier.courier_id }}</strong></td>
                             <td>{{ courier.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ courier.brought_by_name or 'N/A' }}</td>
                             <td>{{ courier.items|length }}</td>
                             <td>{{ courier.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>
@@ -81,6 +83,7 @@
                         <tr>
                             <th>Courier ID</th>
                             <th>Date</th>
+                            <th>Brought By</th>
                             <th>Items Count</th>
                             <th>Approved Items</th>
                             <th>Created At</th>
@@ -92,6 +95,7 @@
                         <tr>
                             <td><strong>{{ courier.courier_id }}</strong></td>
                             <td>{{ courier.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ courier.brought_by_name or 'N/A' }}</td>
                             <td>{{ courier.items|length }}</td>
                             <td>
                                 <span class="badge bg-success">

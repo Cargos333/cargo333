@@ -2885,11 +2885,6 @@ def couriers():
     """List all couriers"""
     all_couriers = Courier.query.order_by(Courier.created_at.desc()).all()
     
-    # Filter couriers based on role visibility
-    # Secretary and Manager only see couriers with contact info (name or phone)
-    if current_user.role in ['Secretary', 'Manager']:
-        all_couriers = [c for c in all_couriers if c.brought_by_name or c.brought_by_phone]
-    
     # Separate couriers into new (unapproved) and approved
     new_couriers = []
     approved_couriers = []
@@ -2901,6 +2896,11 @@ def couriers():
             approved_couriers.append(courier)
         else:
             new_couriers.append(courier)
+    
+    # Filter new couriers based on role visibility
+    # Secretary and Manager only see new couriers with contact info (name or phone)
+    if current_user.role in ['Secretary', 'Manager']:
+        new_couriers = [c for c in new_couriers if c.brought_by_name or c.brought_by_phone]
     
     return render_template('couriers.html', couriers=new_couriers, approved_couriers=approved_couriers)
 

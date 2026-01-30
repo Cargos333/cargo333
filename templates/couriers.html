@@ -69,7 +69,6 @@
     </div>
     
     <!-- History Section - Approved Couriers -->
-    {% if current_user.role not in ['Secretary', 'Manager'] %}
     <div class="card mt-4">
         <div class="card-body">
             <h5 class="card-title">
@@ -115,7 +114,6 @@
             {% endif %}
         </div>
     </div>
-    {% endif %}
 </div>
 
 <!-- Create Courier Modal -->

@@ -139,6 +139,7 @@ class FinanceRecord(db.Model):
     notes = db.Column(db.Text)
     # User who added the record
     added_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    added_by_user = db.relationship('User', backref=db.backref('finance_records', lazy=True))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def calculate_total(self):

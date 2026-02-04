@@ -1057,6 +1057,46 @@ def delete_finance_record(id):
     
     return redirect(url_for('finance'))
 
+@app.route('/finance/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_finance_record(id):
+    record = FinanceRecord.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            name = request.form.get('name', '').strip()
+            amount = float(request.form.get('amount', 0) or 0)
+            service_charge = float(request.form.get('service_charge', 0) or 0)
+            payment_method = request.form.get('payment_method', 'cash')
+            notes = request.form.get('notes', '').strip()
+            
+            if not name:
+                flash('Name is required', 'danger')
+                return redirect(url_for('edit_finance_record', id=id))
+            
+            # Update the record
+            record.name = name
+            record.amount = amount
+            record.service_charge = service_charge
+            record.payment_method = payment_method
+            record.notes = notes
+            record.total_amount = record.calculate_total()
+            
+            db.session.commit()
+            
+            flash(f'Ticket updated successfully for {name}. Total: €{record.total_amount:.2f}', 'success')
+            return redirect(url_for('finance'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating ticket: {str(e)}', 'danger')
+            return redirect(url_for('edit_finance_record', id=id))
+    
+    # GET request - show edit form
+    return render_template('edit_finance.html', record=record)
+
 @app.route('/finance/delete_multiple', methods=['POST'])
 @login_required
 @admin_required
@@ -1196,7 +1236,8 @@ def billetage():
                          tickets=tickets,
                          difference=difference,
                          user_dict=user_dict,
-                         filter_date=filter_date)
+                         filter_date=filter_date,
+                         current_date=datetime.utcnow().date().strftime('%Y-%m-%d'))
 
 @app.route('/billetage/<int:id>/edit', methods=['GET', 'POST'])
 @login_required

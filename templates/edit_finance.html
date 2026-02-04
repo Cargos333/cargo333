@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Edit Finance Ticket</h1>
+    
+    <!-- Edit Ticket Form -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-edit"></i> Edit Ticket #{{ record.id }}</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_finance_record', id=record.id) }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{{ record.name }}" required placeholder="Enter customer name">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Amount (€) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="amount" name="amount" 
+                                   value="{{ record.amount }}" step="0.01" min="0" required placeholder="Enter amount">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="service_charge" class="form-label">Service Charge (€) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="service_charge" name="service_charge" 
+                                   value="{{ record.service_charge }}" step="0.01" min="0" required placeholder="Enter service charge">
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="payment_method" class="form-label">Payment Method <span class="text-danger">*</span></label>
+                            <select class="form-control" id="payment_method" name="payment_method" required>
+                                <option value="cash" {% if record.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                                <option value="card" {% if record.payment_method == 'card' %}selected{% endif %}>Card</option>
+                                <option value="transfer" {% if record.payment_method == 'transfer' %}selected{% endif %}>Bank Transfer</option>
+                                <option value="other" {% if record.payment_method == 'other' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes/Description</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="2" 
+                                      placeholder="Add any notes or description (optional)">{{ record.notes or '' }}</textarea>
+                        </div>
+                        
+                        <!-- Preview Total -->
+                        <div class="alert alert-info">
+                            <strong>Total:</strong> €<span id="preview_total">{{ "%.2f"|format(record.total_amount) }}</span>
+                            <br>
+                            <small class="text-muted">Amount - Service Charge</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-end">
+                    <a href="{{ url_for('finance') }}" class="btn btn-secondary me-2">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save"></i> Update Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Ticket Info -->
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-info-circle"></i> Ticket Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Created:</strong> {{ record.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    <p><strong>Added By:</strong> {{ record.added_by_user.username if record.added_by_user else 'N/A' }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Ticket ID:</strong> {{ record.id }}</p>
+                    <p><strong>Payment Status:</strong> 
+                        <span class="badge {% if record.is_paid %}bg-success{% else %}bg-danger{% endif %}">
+                            {% if record.is_paid %}Paid{% else %}Unpaid{% endif %}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for live total preview -->
+<script>
+    // Function to calculate and display preview total
+    function updatePreviewTotal() {
+        const amount = parseFloat(document.getElementById('amount').value) || 0;
+        const serviceCharge = parseFloat(document.getElementById('service_charge').value) || 0;
+        
+        const total = amount - serviceCharge;
+        
+        document.getElementById('preview_total').textContent = total.toFixed(2);
+    }
+    
+    // Add event listeners to input fields
+    document.getElementById('amount').addEventListener('input', updatePreviewTotal);
+    document.getElementById('service_charge').addEventListener('input', updatePreviewTotal);
+    
+    // Initialize preview on page load
+    updatePreviewTotal();
+</script>
+
+{% endblock %}

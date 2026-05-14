@@ -858,7 +858,7 @@ function printClientRow(shipmentId, currency = 'aed') {
             });
 
             // Money conversion helper - keep same formula used below for final total
-            const toEUR = (amount) => Math.round((parseFloat(amount) || 0) * 132 / 500);
+            const toEUR = (amount) => Math.round((parseFloat(amount) || 0) * 125 / 500);
             const convertForCurrency = (amount) => {
                 if (currency && currency.toLowerCase() === 'eur') return toEUR(amount);
                 return Math.round(parseFloat(amount) || 0);
